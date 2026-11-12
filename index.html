@@ -13,8 +13,10 @@
 @media (prefers-color-scheme:dark){:root{--bg:#141311;--ink:#F3F0EA;--muted:#A8A298;--line:#2D2A26;--card:#1D1B18;--gT:#5CB27F;--aT:#E0A800;--rT:#FF7A70}}
 body.cb{--green:#0059B3;--amber:#F0B400;--red:#A81C1C;--redhot:#B71C1C;--gT:#0059B3;--aT:#8A6A00;--rT:#A81C1C;--zbad:#A81C1C;--zmid:#F0B400;--zgood:#0059B3}
 @media (prefers-color-scheme:dark){body.cb{--gT:#6EA8FF;--aT:#F0B400;--rT:#FF8A80}}
-body.cb #circle.st-amber{color:#161513;outline:6px dashed var(--ink);outline-offset:6px}
-body.cb #circle.st-red{outline:6px solid var(--ink);outline-offset:6px}
+body.cb #circle.st-green{background:#0B3D91;color:#fff}
+body.cb #circle.st-blue{background:#9CC9F0;color:#0B1A26}
+body.cb #circle.st-amber{background:#F0B400;color:#161513;outline:6px dashed var(--ink);outline-offset:6px}
+body.cb #circle.st-red{background:#A81C1C;outline:6px solid var(--ink);outline-offset:6px}
 body.cb .band.cA{background:#555;color:#fff}
 body.cb #zones div:nth-child(2),body.cb #zones div:nth-child(4){background:repeating-linear-gradient(45deg,#F0B400 0 6px,#8A6A00 6px 9px)}
 *{box-sizing:border-box}
@@ -68,9 +70,26 @@ header{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-cont
 #live{display:grid;grid-template-columns:minmax(260px,.9fr) minmax(0,1.3fr);gap:28px 56px;align-items:start;padding-top:8px}
 #centre{text-align:center}
 #circle{margin:6px auto 12px;width:clamp(150px,30vmin,300px);height:clamp(150px,30vmin,300px);border-radius:50%;background:var(--muted);color:#fff;display:flex;align-items:center;justify-content:center;font-size:clamp(30px,7.6vmin,76px);font-weight:500;transition:background .6s}
-#circle.st-green{background:var(--green)}#circle.st-amber{background:var(--amber)}#circle.st-red{background:var(--redhot)}
+#circle.st-green{background:#1E5E3A;color:#fff}
+#circle.st-blue{background:#4FB3E8;color:#0B1A26}
+#circle.st-amber{background:#E58A00;color:#161513}
+#circle.st-red{background:#D32F2F;color:#fff}
+#circle.st-black{background:#000;color:#fff;box-shadow:0 0 0 8px #fff,0 0 0 12px #000}
 #circle.pulse{animation:cpulse 1.2s ease-in-out 1}
+#circle.spulse{animation:spulse 2.2s ease-in-out 1}
 @keyframes cpulse{0%{transform:scale(1)}50%{transform:scale(1.09)}100%{transform:scale(1)}}
+@keyframes spulse{0%{transform:scale(1);filter:brightness(1)}45%{transform:scale(1.12);filter:brightness(1.35)}100%{transform:scale(1);filter:brightness(1)}}
+/* wrap-up screen (150% and over) */
+#land{position:fixed;inset:0;z-index:95;background:#000;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0;transition:opacity .5s;pointer-events:none}
+#land.on{opacity:1;pointer-events:auto}
+#landT{font-size:clamp(90px,30vmin,340px);font-weight:300;letter-spacing:-.02em;animation:landpulse 3s ease-in-out infinite}
+#landH{position:absolute;bottom:24px;font-size:13px;color:#777}
+@keyframes landpulse{0%,100%{opacity:1}50%{opacity:.6}}
+#micAge{font-size:13px;color:var(--muted);cursor:pointer;border:none;padding:0;min-height:0}
+#micAge.warn{color:var(--aT)}
+#chkStep{font-size:18px;font-weight:500;min-height:30px;padding-top:12px}
+.vm.big{height:16px;border-radius:8px;position:relative}.vm.big b{height:16px}
+.vm.big i{position:absolute;top:0;bottom:0;width:2px;background:var(--ink);left:0;display:none}
 #ans{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 #state{font-size:15px;font-weight:500;margin-top:4px;color:var(--muted)}
 #state.g{color:var(--gT)}#state.a{color:var(--aT)}#state.r{color:var(--rT)}
@@ -125,10 +144,11 @@ td{padding:11px 8px;border-bottom:1px solid var(--line)}
 .sg{grid-template-columns:repeat(2,minmax(0,1fr))}
 body.talkFlash .bar{width:12vw}body.talkHold .bar{width:6vw}
 }
-@media (prefers-reduced-motion:reduce){.bar,.band,#arrow,#circle{transition:none}}
+@media (prefers-reduced-motion:reduce){.bar,.band,#arrow,#circle{transition:none}#landT{animation:none}}
 </style>
 </head>
 <body>
+<div id="land" aria-live="assertive"><div id="landT">0:00</div><div id="landH">Wrap up · Space starts a new answer</div></div>
 <div id="wash"></div>
 <div class="bar" id="barL"></div><div class="bar" id="barR"></div>
 <div class="band top" id="bandTop"><span></span></div>
@@ -140,6 +160,7 @@ body.talkFlash .bar{width:12vw}body.talkHold .bar{width:6vw}
 <div class="hl">
 <div class="title">Interview Coach</div>
 <div class="status" id="status"><span class="dot"></span><span id="statusTxt">Not listening</span></div>
+<button id="micAge" type="button">Mic not checked</button>
 <select id="lang" aria-label="Language"><option value="en-GB">English (UK)</option><option value="en-US">English (US)</option></select>
 </div>
 <div class="hr">
@@ -206,10 +227,13 @@ body.talkFlash .bar{width:12vw}body.talkHold .bar{width:6vw}
 <div id="settings" hidden>
 <div id="sp">
 <div style="display:flex;justify-content:space-between;align-items:center"><div style="font-size:20px;font-weight:500">Settings</div><button id="btnClose" class="quiet">Close</button></div>
-<div class="sr"><span>Talking-too-long limit</span><span><input type="range" id="sTl" min="2" max="4" step="0.5"> <b id="sTlV"></b></span></div>
+<div class="sr"><span>Answer time limit</span><span><input type="range" id="sTl" min="1" max="4" step="0.5"> <b id="sTlV"></b></span></div>
 <div class="sr"><span>Green pace from (wpm)</span><input type="number" id="sLo" min="70" max="200" style="width:80px"></div>
 <div class="sr"><span>Green pace to (wpm)</span><input type="number" id="sHi" min="80" max="230" style="width:80px"></div>
-<div class="sr"><span>New answer after silence</span><span><input type="range" id="sSil" min="3" max="8" step="1"> <b id="sSilV"></b></span></div>
+<div class="sr"><span>New answer after silence</span><span><input type="range" id="sSil" min="3" max="12" step="1"> <b id="sSilV"></b></span></div>
+<div class="sr"><span>Count as a short reply if under</span><span><input type="range" id="sShort" min="5" max="30" step="5"> <b id="sShortV"></b></span></div>
+<div class="sr"><span>Multicolour circle steps (off = simple green, amber, red)</span><input type="checkbox" id="cSteps"></div>
+<div class="sr"><span>Black wrap-up screen at 150% of the limit</span><input type="checkbox" id="cLand"></div>
 <div class="sr"><span>Flash length (seconds)</span><span><input type="range" id="sFl" min="1" max="4" step="0.5"> <b id="sFlV"></b></span></div>
 <div class="sr"><span>Word band hold (seconds)</span><span><input type="range" id="sHo" min="2" max="10" step="1"> <b id="sHoV"></b></span></div>
 <div class="sr"><span>Talking-too-long alert (sides and circle)</span><input type="checkbox" id="cTalk"></div>
@@ -228,9 +252,11 @@ body.talkFlash .bar{width:12vw}body.talkHold .bar{width:6vw}
 <div id="cp">
 <div style="display:flex;justify-content:space-between;align-items:center"><div style="font-size:20px;font-weight:500">Setup check</div><button id="chkClose" class="quiet">Close</button></div>
 <div class="sr"><label><input type="checkbox" id="chkHp"> I am wearing headphones, so the interviewer's voice stays out of my microphone</label></div>
-<div class="sr"><span>1. Microphone level</span><button id="chkMic" class="quiet">Test microphone</button></div>
-<div class="vm"><b id="chkBar"></b></div>
-<div id="chkLvl" class="ms n" style="margin:8px 0 14px">Press Test microphone and say a few words.</div>
+<div class="sr"><span>1. Mic test (8 seconds)</span><button id="chkMic" class="quiet">Start mic test</button></div>
+<div id="chkStep">Sit where you will sit for the interview, then press Start mic test.</div>
+<div class="vm big"><b id="chkBar"></b><i id="chkThr"></i></div>
+<div id="chkLvl" class="ms n" style="margin:8px 0 4px"></div>
+<div id="chkSaved" class="hint" style="margin:0 0 14px;line-height:1.6"></div>
 <div class="sr"><span>2. Say a sentence</span><button id="chkSpeech" class="quiet">Test speech</button></div>
 <div class="hint" style="padding-top:8px">Say: “Good morning, I am ready for my interview.”</div>
 <div id="chkSay" style="font-size:16px;min-height:44px;padding:8px 0"></div>
@@ -300,6 +326,19 @@ function paceBand(w,lo,hi){
   return w<lo?'slow':'fast';
 }
 function timerState(el,lim){return el<0.75*lim?'green':(el<lim?'amber':'red');}
+function stepFor(el,lim,multi){var p=el/lim;if(multi&&p>=1.5)return 'black';if(p>=1)return 'red';if(p>=0.75)return 'amber';if(multi&&p>=0.5)return 'blue';return 'green';}
+var MIN_THR=0.0012,DEF_THR=0.0035;
+function pct(arr,q){if(!arr.length)return 0;var s=arr.slice().sort(function(a,b){return a-b;});return s[Math.min(s.length-1,Math.floor(q*s.length))];}
+/* quiet = levels while silent, speak = levels while saying the sentence */
+function micFromTest(quiet,speak){
+  var noise=Math.max(0.0002,pct(quiet,0.5));
+  var vf=speak.filter(function(r){return r>noise*3&&r>0.0008;});
+  if(vf.length<15)return null;
+  var voice=pct(vf,0.6);
+  var thr=Math.max(MIN_THR,noise*2.5,voice*0.3);
+  thr=Math.min(thr,0.02);
+  return {thr:thr,noise:noise,voice:voice,ratio:voice/noise};
+}
 function fmt(ms){var s=Math.max(0,Math.floor(ms/1000));return Math.floor(s/60)+':'+('0'+(s%60)).slice(-2);}
 function top3(s){
   var c=[];
@@ -321,17 +360,30 @@ function top3(s){
 //#PURE-END
 
 var QUESTIONS=["Tell me about yourself.","Tell me about a time you turned around a failing program.","How do you run a business review?","Walk me through how you would build a plan for a new region.","Tell me about a time you disagreed with your leader and how you handled it.","How do you prioritise when everything is urgent?","Describe a decision you made with incomplete data.","Tell me about a time you influenced a senior stakeholder without authority.","How do you set targets and quotas for a team?","Tell me about your biggest failure and what you changed afterwards.","How would you diagnose a drop in pipeline coverage?","Tell me about a process you simplified and the result.","How do you build a forecast you can defend?","Describe a time you had to deliver bad news to leadership.","How do you decide where to invest limited resources?","Tell me about a cross-functional project that was stuck and how you unblocked it.","How do you measure the success of an operating cadence?","Tell me about a time you led through ambiguity.","How would you structure a revenue operations team?","Describe how you have used data to change a strategy.","Tell me about a time you had to say no to a senior colleague.","How do you manage a team that is under pressure and behind plan?","Tell me about a time you built something from scratch.","How do you align sales, marketing and product on one plan?","Describe a time you coached someone who was struggling.","What is your approach to a first 90 days in a new role?","Tell me about a time you challenged the status quo.","How do you handle a stakeholder who keeps changing priorities?","Tell me about a time you delivered a result ahead of a tight deadline.","Why this role and why now?"];
-var DEF={tlMin:2,paceLo:120,paceHi:150,silenceSec:4,lang:'en-GB',cueTalk:true,cueWords:true,cueSpeed:true,cueText:true,flashSec:2,holdSec:5,cb:false,quiet:false,compact:false,transcript:true,practice:false};
+var DEF={v:2,tlMin:2,paceLo:120,paceHi:150,silenceSec:8,shortSec:15,steps:true,landIt:true,lang:'en-GB',cueTalk:true,cueWords:true,cueSpeed:true,cueText:true,flashSec:2,holdSec:5,cb:false,quiet:false,compact:false,transcript:true,practice:false};
 var cfg=loadCfg();
-function loadCfg(){var c=Object.assign({},DEF);try{var r=localStorage.getItem('ic_cfg');if(r){var o=JSON.parse(r);Object.keys(DEF).forEach(function(k){if(o[k]!==undefined&&typeof o[k]===typeof DEF[k])c[k]=o[k];});}}catch(e){}return c;}
+function loadCfg(){var c=Object.assign({},DEF);try{var r=localStorage.getItem('ic_cfg');if(r){var o=JSON.parse(r);
+  if(o.v!==DEF.v){['silenceSec','tlMin','paceLo','paceHi'].forEach(function(k){delete o[k];});o.v=DEF.v;}
+  Object.keys(DEF).forEach(function(k){if(o[k]!==undefined&&typeof o[k]===typeof DEF[k])c[k]=o[k];});}}catch(e){}return c;}
 function saveCfg(){try{localStorage.setItem('ic_cfg',JSON.stringify(cfg));}catch(e){}}
+/* saved mic level: numbers only, never audio */
+function loadMic(){try{var m=JSON.parse(localStorage.getItem('ic_mic')||'null');if(m&&typeof m.thr==='number'&&typeof m.t==='number')return m;}catch(e){}return null;}
+function saveMic(m){try{localStorage.setItem('ic_mic',JSON.stringify(m));}catch(e){}}
 var $=function(id){return document.getElementById(id);};
+function ago(ms){var m=Math.floor(ms/60000);if(m<1)return 'just now';if(m<60)return m+' min ago';var h=Math.floor(m/60);if(h<48)return h+' h ago';return Math.floor(h/24)+' days ago';}
+function showMicAge(){
+  var m=loadMic(),e=$('micAge');
+  if(!m){e.textContent='Mic not checked';e.className='warn';return;}
+  var d=Date.now()-m.t;e.textContent='Mic checked '+ago(d)+(d>30*60000?' · Check again?':'');e.className=d>30*60000?'warn':'';
+}
 
 var S={running:false,rec:null,epoch:0,segs:{},answers:[],cur:null,nextId:1,ctx:null,stream:null,an:null,buf:null,vadT:null,tickT:null,
  voiced:false,voiceStart:0,lastVoiceEnd:0,hang:0,floor:0.004,level:0,lvl:[],voicedLog:[],wordEvents:[],wpmEma:null,paused:false,pauseAt:0,wl:null,bSum:0,bN:0,tail:[],fadeLog:[],totalWords:0,totalVoiced:0,
- burst:null,lastBurst:null,lastWordFire:0,hits:[],cueText:'',restartDelay:250,calib:null,qOrder:[],qIdx:0,wT1:null,wT2:null,wT3:null,tT:null,lastTr:0,sessionStart:0};
+ burst:null,lastBurst:null,lastWordFire:0,hits:[],cueText:'',restartDelay:250,calib:null,qOrder:[],qIdx:0,wT1:null,wT2:null,wT3:null,tT:null,lastTr:0,sessionStart:0,
+ thr:DEF_THR,micVoice:0,rq:[],lastLoud:0,lastLower:0};
+var HANG=700;
 
-function newAns(){return {id:S.nextId++,start:null,lastVoiceEnd:null,voicedMs:0,longPauses:0,hes:0,ends:0,fades:0,redFired:false,nextPulse:0};}
+function newAns(){return {id:S.nextId++,start:null,lastVoiceEnd:null,voicedMs:0,longPauses:0,hes:0,ends:0,fades:0,redFired:false,nextPulse:0,step:'green'};}
 
 /* ---------- messages ---------- */
 function showMsg(t,err){var m=$('msg');if(!t){m.hidden=true;return;}m.textContent=t;m.className=err?'err':'';m.hidden=false;}
@@ -374,8 +426,7 @@ function onResult(e){
     if(!seg){seg=S.segs[key]={ans:S.cur.id,tokens:[],n:0,hits:[],seen:{},I:0,W:0,N:0,text:'',final:false};}
     var w=words(text),tk=w.map(function(x){return x.toLowerCase();});
     var delta=tk.length-seg.n;
-    if(delta>0){S.wordEvents.push({t:now,n:delta});S.totalWords+=delta;
-      if(!S.vadSeen){ if(!S.voiced){S.voiced=true;S.voiceStart=now;S.hang=now+900;onVoiceStart(now);} else {S.hang=now+900;} }}
+    if(delta>0){S.wordEvents.push({t:now,n:delta});S.totalWords+=delta;wordsHeard(now);}
     seg.tokens=tk;seg.disp=w;seg.n=tk.length;seg.text=text;seg.final=res.isFinal;
     seg.hits=detect(tk);
     var st=segStats(tk);seg.I=st.I;seg.W=st.W;seg.N=st.N;
@@ -418,6 +469,9 @@ function talkPulse(){
   c.classList.remove('pulse');reflow(c);c.classList.add('pulse');
   setTimeout(function(){b.classList.remove('talkPulse');c.classList.remove('pulse');},1300);
 }
+function stepPulse(){var c=$('circle');c.classList.remove('spulse');reflow(c);c.classList.add('spulse');setTimeout(function(){c.classList.remove('spulse');},2300);}
+function showLand(on){var l=$('land');if(l.classList.contains('on')!==!!on)l.classList.toggle('on',!!on);}
+function lvW(x){return Math.max(0,Math.min(1,(Math.log10(Math.max(x,1e-5))+3.5)/2.5));}
 function clearTalk(){clearTimeout(S.tT);var b=document.body;b.classList.remove('talkFlash','talkHold','talkPulse');}
 
 /* ---------- audio / voice activity ---------- */
@@ -426,19 +480,42 @@ function vad(){
   S.an.getFloatTimeDomainData(S.buf);
   var sum=0,i;for(i=0;i<S.buf.length;i++){sum+=S.buf[i]*S.buf[i];}
   var rms=Math.sqrt(sum/S.buf.length),now=performance.now();
+  vadStep(rms,now);
+}
+/* The threshold comes from the saved mic test (or a safe default).
+   It is NEVER raised while running. It can only be lowered:
+   (a) after 20 s with nothing loud, if the room is much quieter than the threshold, or
+   (b) when Chrome hears words but the level stayed under the threshold (a quiet voice). */
+function vadStep(rms,now){
   S.level=S.level*0.7+rms*0.3;
-  var thr=Math.max(0.006,S.floor*3),loud=rms>thr;if(loud)S.vadSeen=true;if(S.ctx&&S.ctx.state==='suspended'){try{S.ctx.resume();}catch(e){}}
-  if(!loud)S.floor=S.floor*0.98+rms*0.02;
-  if(loud)S.hang=now+350;
+  if(S.ctx&&S.ctx.state==='suspended'){try{S.ctx.resume();}catch(e){}}
+  var loud=rms>S.thr;
+  if(loud){S.hang=Math.max(S.hang,now+HANG);S.lastLoud=now;}
+  S.rq.push(rms);if(S.rq.length>300)S.rq.shift();
+  if(!loud&&now-S.lastLoud>20000&&now-S.lastLower>5000&&S.rq.length>=300){
+    var target=Math.max(MIN_THR,pct(S.rq,0.9)*2);
+    if(target<S.thr){S.thr=Math.max(target,S.thr*0.85);S.lastLower=now;}
+  }
   var v=loud||now<S.hang;
   if(v&&!S.voiced){S.voiced=true;S.voiceStart=now;onVoiceStart(now);}
-  else if(!v&&S.voiced){S.voiced=false;onVoiceEnd(S.hang-350);}
+  else if(!v&&S.voiced){S.voiced=false;onVoiceEnd(S.hang-HANG);}
   if(loud&&S.voiced){S.bSum+=rms;S.bN++;S.tail.push(rms);if(S.tail.length>6)S.tail.shift();}
   if(S.voiced){S.lvl.push(rms);if(S.lvl.length>60)S.lvl.shift();}
 }
+/* Words from Chrome are a backup sign of speech: they keep the answer open
+   even when the level is low, and they lower the threshold if it missed a quiet voice. */
+function wordsHeard(now){
+  if(S.paused||!S.running)return;
+  if(now-S.lastLoud>1500&&now-S.lastLower>1500){
+    var bound=Math.max(MIN_THR,pct(S.rq,0.2)*2.5);
+    if(S.thr*0.9>=bound){S.thr*=0.9;S.lastLower=now;}
+  }
+  if(!S.voiced){S.voiced=true;S.voiceStart=now-300;onVoiceStart(now-300);}
+  S.hang=Math.max(S.hang,now+900);
+}
 function finalizeBurst(gapAfter){
   var b=S.lastBurst;if(!b||b.counted)return;b.counted=true;
-  if(b.dur<600&&b.gapBefore>=400&&gapAfter>=400){b.ans.hes++;}
+  if(b.dur<600&&b.gapBefore>=HANG&&gapAfter>=HANG){b.ans.hes++;}
 }
 function onVoiceStart(t){
   var gap=S.lastVoiceEnd?t-S.lastVoiceEnd:Infinity;
@@ -464,7 +541,7 @@ function snapshot(a){
   var now=performance.now();
   var endT=a.lastVoiceEnd||now;
   var dur=a.start===null?0:Math.max(0,endT-a.start);
-  return {id:a.id,durMs:dur,voicedMs:a.voicedMs,words:g.words,wpm:a.voicedMs>=3000?g.words/(a.voicedMs/60000):null,
+  return {id:a.id,durMs:dur,short:dur<cfg.shortSec*1000,voicedMs:a.voicedMs,words:g.words,wpm:a.voicedMs>=3000?g.words/(a.voicedMs/60000):null,
     A:g.A,B:g.B,C:g.C,I:g.I,W:g.W,N:g.N,longPauses:a.longPauses,hes:a.hes,ends:a.ends,fades:a.fades,reps:g.reps,text:g.text.join(' ')};
 }
 function finalizeCur(){
@@ -478,8 +555,8 @@ function newAnswer(manual){
   finalizeCur();
   S.cur=newAns();S.wordEvents=[];S.voicedLog=[];S.hits=[];S.fadeLog=[];S.wpmEma=null;
   if(S.voiced){S.cur.start=performance.now();if(S.burst)S.burst.ans=S.cur;}
-  clearTalk();clearWords();
-  $('circle').className='st-green';
+  clearTalk();clearWords();showLand(false);
+  $('circle').className='st-idle';
   renderTrans();
 }
 function elapsed(){
@@ -505,26 +582,32 @@ function wpmNow(){
 /* ---------- main tick ---------- */
 function tick(){
   if(!S.running)return;
-  if(S.paused){var pe=(S.cur&&S.cur.start!==null)?Math.max(0,(S.cur.lastVoiceEnd||S.pauseAt)-S.cur.start):0;$('timer').textContent=fmt(pe);$('state').textContent='Paused · press P to resume';$('state').className='';setCue('');return;}
+  if(S.paused){showLand(false);var pe=(S.cur&&S.cur.start!==null)?Math.max(0,(S.cur.lastVoiceEnd||S.pauseAt)-S.cur.start):0;$('timer').textContent=fmt(pe);$('state').textContent='Paused · press P to resume';$('state').className='';setCue('');return;}
   var now=performance.now(),a=S.cur;
   S.wordEvents=S.wordEvents.filter(function(e){return now-e.t<60000;});
   S.voicedLog=S.voicedLog.filter(function(p){return now-p[1]<60000;});
   S.hits=S.hits.filter(function(h){return now-h.t<15000;});
-  if(!S.voiced&&S.lastBurst&&!S.lastBurst.counted&&now-S.lastBurst.e>=400)finalizeBurst(400);
+  if(!S.voiced&&S.lastBurst&&!S.lastBurst.counted&&now-S.lastBurst.e>=HANG)finalizeBurst(HANG);
   var el=elapsed(),lim=cfg.tlMin*60000,st=timerState(el,lim),ended=isEnded();
-  $('timer').textContent=fmt(el);
+  var step=a.start===null?'idle':(ended&&a.step?a.step:stepFor(el,lim,cfg.steps));
+  $('timer').textContent=fmt(el);$('landT').textContent=fmt(el);
   $('ans').textContent='Answer '+a.id;
-  var c=$('circle');c.className=(a.start===null?'st-idle':'st-'+st)+(c.classList.contains('pulse')?' pulse':'');
-  var sEl=$('state');
-  if(a.start===null){sEl.textContent='Waiting for you to speak';sEl.className='';}
-  else if(st==='green'){sEl.textContent=cfg.cb?'On track':'Green · on track';sEl.className='g';}
-  else if(st==='amber'){sEl.textContent=cfg.cb?'Warning · wrap up soon':'Amber · wrap up soon';sEl.className='a';}
-  else {sEl.textContent=cfg.cb?'Alert · wrap up':'Red · wrap up';sEl.className='r';}
-  if(cfg.cueTalk&&st==='red'&&!ended){
+  var c=$('circle'),keep=['pulse','spulse'].filter(function(k){return c.classList.contains(k);});
+  c.className=['st-'+step].concat(keep).join(' ');
+  if(a.start!==null&&step!==a.step){var up=['green','blue','amber','red','black'].indexOf(step)>['green','blue','amber','red','black'].indexOf(a.step);a.step=step;if(up)stepPulse();}
+  showLand(cfg.landIt&&a.start!==null&&!ended&&el>=1.5*lim);
+  var sEl=$('state'),pctTxt=Math.round(el/lim*100)+'% of '+cfg.tlMin+' min';
+  if(a.start===null){var m=loadMic();sEl.textContent=m?'Waiting for you to speak':'Waiting for you to speak · Mic not checked';sEl.className='';}
+  else if(step==='green'){sEl.textContent='On track';sEl.className='g';}
+  else if(step==='blue'){sEl.textContent='Halfway · '+pctTxt;sEl.className='g';}
+  else if(step==='amber'){sEl.textContent='Wrap up soon · '+pctTxt;sEl.className='a';}
+  else if(step==='red'){sEl.textContent='Over time · wrap up';sEl.className='r';}
+  else {sEl.textContent='Land it now';sEl.className='r';}
+  if(cfg.cueTalk&&st==='red'&&!ended&&!(cfg.landIt&&el>=1.5*lim)){
     if(!a.redFired){a.redFired=true;a.nextPulse=lim+10000;talkFlash();}
     else if(el>=a.nextPulse){a.nextPulse+=10000;talkPulse();}
   }
-  if(ended||st!=='red'){if(document.body.classList.contains('talkHold')||document.body.classList.contains('talkFlash'))clearTalk();}
+  if(ended||st!=='red'||(cfg.landIt&&el>=1.5*lim)){if(document.body.classList.contains('talkHold')||document.body.classList.contains('talkFlash'))clearTalk();}
   /* speed */
   var w=wpmNow(),sp=$('speed'),ar=$('arrow');
   sp.hidden=!cfg.cueSpeed;
@@ -549,9 +632,9 @@ function tick(){
   setM('end',a.fades,a.ends?[a.fades+' of '+a.ends+' faded',a.fades>a.ends/2?'a':'g']:['Needs a few sentences','n']);
   setM('rep',g.reps.length,g.reps.length?[g.reps.slice(0,2).map(function(r){return '“'+r.w+'” ×'+r.n;}).join(' · '),'a']:['None','n']);
   var lvAvg=S.lvl.length?S.lvl.reduce(function(x,y){return x+y;},0)/S.lvl.length:0;
-  $('vmB').style.width=Math.min(100,S.level/0.12*100)+'%';
-  var vs=$('s_vol');
-  if(S.lvl.length>10&&lvAvg<0.01){vs.textContent='Too quiet';vs.className='ms a';}
+  $('vmB').style.width=(lvW(S.level)*100)+'%';
+  var vs=$('s_vol'),tooQuiet=S.lvl.length>10&&lvAvg<(S.micVoice?S.micVoice*0.45:0.003);
+  if(tooQuiet){vs.textContent='Too quiet';vs.className='ms a';}
   else if(S.lvl.length>10&&lvAvg>0.15){vs.textContent='Too loud';vs.className='ms r';}
   else{vs.textContent=S.lvl.length>10?'Good level':'–';vs.className='ms '+(S.lvl.length>10?'g':'n');}
   /* text cue */
@@ -568,7 +651,7 @@ function tick(){
     else if(S.fadeLog.filter(function(t){return now-t<30000;}).length>=2)cue='Finish strong';
     else if(g.W>g.I&&g.W>=3)cue='Say “I”, not “we”';
     else if(a.start!==null&&el>=60000&&g.N===0)cue='Add a number';
-    else if(S.lvl.length>10&&lvAvg<0.01)cue='Speak up';
+    else if(tooQuiet)cue='Speak up';
     else if(S.lvl.length>10&&lvAvg>0.15)cue='A little softer';
   }
   setCue(cue);
@@ -624,10 +707,12 @@ function startSession(){
     var src=S.ctx.createMediaStreamSource(stream);S.an=S.ctx.createAnalyser();S.an.fftSize=2048;S.an.smoothingTimeConstant=0;
     src.connect(S.an);S.buf=new Float32Array(S.an.fftSize);
     S.segs={};S.answers=[];S.nextId=1;S.cur=newAns();S.wordEvents=[];S.voicedLog=[];S.hits=[];
-    S.totalWords=0;S.totalVoiced=0;S.lastVoiceEnd=0;S.voiced=false;S.burst=null;S.lastBurst=null;S.lvl=[];S.floor=0.002;S.vadSeen=false;
+    S.totalWords=0;S.totalVoiced=0;S.lastVoiceEnd=0;S.voiced=false;S.burst=null;S.lastBurst=null;S.lvl=[];S.rq=[];S.lastLoud=0;S.lastLower=0;S.hang=0;
+    var mic=loadMic();S.thr=mic?mic.thr:DEF_THR;S.micVoice=mic?mic.voice:0;
+    if(!mic)showMsg('Mic not checked. Using a safe default level. Run Check setup before your next session for the best results.');
     S.running=true;S.paused=false;lockScreen();S.sessionStart=Date.now();
     $('btnStart').textContent='Stop';$('status').className='status on';$('statusTxt').textContent='Listening';
-    $('summary').hidden=true;$('main').hidden=false;showMsg('');renderTrans();
+    $('summary').hidden=true;$('main').hidden=false;if(mic)showMsg('');renderTrans();
     S.vadT=setInterval(vad,50);S.tickT=setInterval(tick,200);
     startRec();
   }).catch(function(){
@@ -642,7 +727,7 @@ function stopSession(silent){
   if(S.stream){S.stream.getTracks().forEach(function(t){t.stop();});S.stream=null;}
   if(S.ctx){try{S.ctx.close();}catch(e){}S.ctx=null;}
   S.an=null;S.calib=null;S.paused=false;unlockScreen();$('btnPause').textContent='Pause (P)';
-  clearTalk();clearWords();$('speed').hidden=true;
+  clearTalk();clearWords();showLand(false);$('speed').hidden=true;
   $('btnStart').textContent='Start';$('status').className='status';$('statusTxt').textContent='Not listening';
   setCue('');$('state').textContent='Press Start (S)';$('state').className='';
   if(was){finalizeCur();if(!silent&&S.answers.length)showSummary();}
@@ -651,13 +736,14 @@ function toggleSession(){if(S.running)stopSession(false);else startSession();}
 
 /* ---------- summary ---------- */
 function summarise(){
-  var A=S.answers,n=A.length;if(!n)return null;
+  var A=S.answers.filter(function(a){return !a.short;});if(!A.length)A=S.answers;
+  var n=A.length;if(!n)return null;var nShort=S.answers.length-n;
   var sum=function(f){return A.reduce(function(s,a){return s+f(a);},0);};
   var totMs=sum(function(a){return a.durMs;}),mins=Math.max(totMs/60000,0.01);
   var words=sum(function(a){return a.words;}),voiced=sum(function(a){return a.voicedMs;});
   var I=sum(function(a){return a.I;}),W=sum(function(a){return a.W;});
   var E=sum(function(a){return a.ends;}),F=sum(function(a){return a.fades;});
-  return {n:n,avgMs:totMs/n,longestMs:Math.max.apply(null,A.map(function(a){return a.durMs;})),over2:A.filter(function(a){return a.durMs>120000;}).length,
+  return {n:n,nShort:nShort,avgMs:totMs/n,longestMs:Math.max.apply(null,A.map(function(a){return a.durMs;})),over2:A.filter(function(a){return a.durMs>120000;}).length,
     avgWpm:voiced>0?words/(voiced/60000):0,fillPerMin:sum(function(a){return a.A+a.B;})/mins,hedgePerMin:sum(function(a){return a.C;})/mins,
     wePct:(I+W)?W/(I+W)*100:0,fadePct:E>=5?F/E*100:0,noNum:A.filter(function(a){return a.N===0;}).length,hesPerMin:sum(function(a){return a.hes;})/mins,
     limMs:cfg.tlMin*60000,lo:cfg.paceLo,hi:cfg.paceHi,I:I,W:W};
@@ -666,7 +752,7 @@ function showSummary(){
   var s=summarise();if(!s)return;
   $('main').hidden=true;$('summary').hidden=false;
   var g=$('sg');g.textContent='';
-  [['Answers',s.n,''],['Average length',fmt(s.avgMs),''],['Longest',fmt(s.longestMs),''],['Over 2 minutes',s.over2,s.over2?'Too long':''],
+  [['Answers',s.n,s.nShort?'+ '+s.nShort+' short replies':''],['Average length',fmt(s.avgMs),''],['Longest',fmt(s.longestMs),''],['Over 2 minutes',s.over2,s.over2?'Too long':''],
    ['Average pace',Math.round(s.avgWpm)+' wpm',''],['Fillers per minute',s.fillPerMin.toFixed(1),''],['Hedges per minute',s.hedgePerMin.toFixed(1),''],
    ['“I” versus “we”',Math.round(100-s.wePct)+' / '+Math.round(s.wePct),s.wePct>50?'Too many “we”':'']].forEach(function(r){
     var d=document.createElement('div');d.innerHTML='<div class="k"></div><div class="v"></div>';
@@ -676,7 +762,8 @@ function showSummary(){
   var tb=$('tb');tb.textContent='';
   S.answers.forEach(function(a,i){
     var tr=document.createElement('tr');
-    [i+1,fmt(a.durMs),a.wpm===null?'–':Math.round(a.wpm),a.A+a.B,a.C,a.I+' / '+a.W,a.N?a.N:'None',a.longPauses,a.hes,a.ends?a.fades+' of '+a.ends:'–'].forEach(function(v){var td=document.createElement('td');td.textContent=v;tr.appendChild(td);});
+    if(a.short)tr.style.color='var(--muted)';
+    [i+1,fmt(a.durMs)+(a.short?' short':''),a.wpm===null?'–':Math.round(a.wpm),a.A+a.B,a.C,a.I+' / '+a.W,a.N?a.N:'None',a.longPauses,a.hes,a.ends?a.fades+' of '+a.ends:'–'].forEach(function(v){var td=document.createElement('td');td.textContent=v;tr.appendChild(td);});
     tb.appendChild(tr);});
   var ol=$('top3');ol.textContent='';
   top3(s).forEach(function(t){var li=document.createElement('li');li.textContent=t;ol.appendChild(li);});
@@ -686,14 +773,15 @@ function reportText(){
   var s=summarise();if(!s)return 'No answers recorded.';
   var L=[];
   L.push('INTERVIEW DELIVERY COACH REPORT');L.push(new Date().toLocaleString('en-GB'));L.push('');
-  L.push('Answers: '+s.n);L.push('Average length: '+fmt(s.avgMs)+' · Longest: '+fmt(s.longestMs)+' · Over 2 minutes: '+s.over2);
+  L.push('Answers: '+s.n+' (plus '+s.nShort+' short replies under '+cfg.shortSec+' seconds, left out of the averages)');
+  var mic=loadMic();L.push('Mic check: '+(mic?ago(Date.now()-mic.t)+' before the report':'not run, default level used')+' · Answer limit: '+cfg.tlMin+' min · New answer after '+cfg.silenceSec+' s of silence');L.push('Average length: '+fmt(s.avgMs)+' · Longest: '+fmt(s.longestMs)+' · Over 2 minutes: '+s.over2);
   L.push('Average pace: '+Math.round(s.avgWpm)+' wpm · Fillers per minute: '+s.fillPerMin.toFixed(1)+' · Hedges per minute: '+s.hedgePerMin.toFixed(1));
   L.push('I versus we: '+s.I+' / '+s.W+' · Answers with no numbers: '+s.noNum);L.push('');
   L.push('PER ANSWER');
-  S.answers.forEach(function(a,i){L.push((i+1)+'. '+fmt(a.durMs)+' | pace '+(a.wpm===null?'-':Math.round(a.wpm))+' | fillers '+(a.A+a.B)+' | hedges '+a.C+' | I/we '+a.I+'/'+a.W+' | numbers '+a.N+' | long pauses '+a.longPauses+' | hesitations (est.) '+a.hes+' | faded endings '+a.fades+'/'+a.ends);});
+  S.answers.forEach(function(a,i){L.push((i+1)+'. '+fmt(a.durMs)+(a.short?' (short reply)':'')+' | pace '+(a.wpm===null?'-':Math.round(a.wpm))+' | fillers '+(a.A+a.B)+' | hedges '+a.C+' | I/we '+a.I+'/'+a.W+' | numbers '+a.N+' | long pauses '+a.longPauses+' | hesitations (est.) '+a.hes+' | faded endings '+a.fades+'/'+a.ends);});
   L.push('');L.push('TOP THREE THINGS TO IMPROVE');top3(s).forEach(function(t,i){L.push((i+1)+'. '+t);});
   L.push('');L.push('TRANSCRIPT');
-  S.answers.forEach(function(a,i){L.push('');L.push('Answer '+(i+1)+' ('+fmt(a.durMs)+')');L.push(a.text||'(no text)');});
+  S.answers.forEach(function(a,i){L.push('');L.push('Answer '+(i+1)+' ('+fmt(a.durMs)+(a.short?', short reply':'')+')');L.push(a.text||'(no text)');});
   return L.join('\n');
 }
 function copyText(){
@@ -731,6 +819,8 @@ function syncSettings(){
   $('sTl').value=cfg.tlMin;$('sTlV').textContent=cfg.tlMin+' min';
   $('sLo').value=cfg.paceLo;$('sHi').value=cfg.paceHi;
   $('sSil').value=cfg.silenceSec;$('sSilV').textContent=cfg.silenceSec+' s';
+  $('sShort').value=cfg.shortSec;$('sShortV').textContent=cfg.shortSec+' s';
+  $('cSteps').checked=cfg.steps;$('cLand').checked=cfg.landIt;
   $('sFl').value=cfg.flashSec;$('sFlV').textContent=cfg.flashSec+' s';
   $('sHo').value=cfg.holdSec;$('sHoV').textContent=cfg.holdSec+' s';
   $('cCb').checked=cfg.cb;$('cTalk').checked=cfg.cueTalk;$('cWords').checked=cfg.cueWords;$('cSpeed').checked=cfg.cueSpeed;$('cText').checked=cfg.cueText;
@@ -738,15 +828,16 @@ function syncSettings(){
 }
 function bind(){
   function num(id,key,suffix,valId,float){$(id).addEventListener('input',function(){var v=parseFloat($(id).value);if(isNaN(v))return;cfg[key]=v;if(valId)$(valId).textContent=v+suffix;saveCfg();});}
-  num('sTl','tlMin',' min','sTlV');num('sSil','silenceSec',' s','sSilV');num('sFl','flashSec',' s','sFlV');num('sHo','holdSec',' s','sHoV');
+  num('sTl','tlMin',' min','sTlV');num('sSil','silenceSec',' s','sSilV');num('sFl','flashSec',' s','sFlV');num('sHo','holdSec',' s','sHoV');num('sShort','shortSec',' s','sShortV');
   $('sLo').addEventListener('change',function(){var v=parseInt($('sLo').value,10);if(!isNaN(v)&&v<cfg.paceHi){cfg.paceLo=v;saveCfg();}syncSettings();});
   $('sHi').addEventListener('change',function(){var v=parseInt($('sHi').value,10);if(!isNaN(v)&&v>cfg.paceLo){cfg.paceHi=v;saveCfg();}syncSettings();});
-  [['cTalk','cueTalk'],['cWords','cueWords'],['cSpeed','cueSpeed'],['cText','cueText']].forEach(function(p){$(p[0]).addEventListener('change',function(){cfg[p[1]]=$(p[0]).checked;saveCfg();});});
+  [['cTalk','cueTalk'],['cWords','cueWords'],['cSpeed','cueSpeed'],['cText','cueText'],['cSteps','steps'],['cLand','landIt']].forEach(function(p){$(p[0]).addEventListener('change',function(){cfg[p[1]]=$(p[0]).checked;saveCfg();});});
   [['tgPractice','practice'],['tgQuiet','quiet'],['tgCompact','compact'],['tgTrans','transcript']].forEach(function(p){$(p[0]).addEventListener('change',function(){cfg[p[1]]=$(p[0]).checked;saveCfg();applyView();});});
   $('lang').addEventListener('change',function(){cfg.lang=$('lang').value;saveCfg();if(S.running&&S.rec){try{S.rec.stop();}catch(e){}}});
   $('cCb').addEventListener('change',function(){cfg.cb=$('cCb').checked;saveCfg();applyView();});
   $('btnPause').addEventListener('click',function(){this.blur();togglePause();});
   $('btnCheck').addEventListener('click',function(){this.blur();openCheck();});
+  $('micAge').addEventListener('click',function(){this.blur();openCheck();});
   $('btnFull').addEventListener('click',function(){this.blur();toggleFull();});
   $('chkClose').addEventListener('click',closeCheck);$('chkMic').addEventListener('click',testMic);$('chkSpeech').addEventListener('click',testSpeech);
   $('check').addEventListener('click',function(e){if(e.target===$('check'))closeCheck();});
@@ -823,18 +914,27 @@ function testMic(){
   var AC=window.AudioContext||window.webkitAudioContext;CK.ctx=new AC();try{CK.ctx.resume();}catch(e){}
   navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:false}}).then(function(st){
     CK.stream=st;var src=CK.ctx.createMediaStreamSource(st);CK.an=CK.ctx.createAnalyser();CK.an.fftSize=2048;src.connect(CK.an);
-    CK.buf=new Float32Array(2048);CK.peak=[];CK.lv=0;
+    CK.buf=new Float32Array(2048);CK.lv=0;
+    var t0=performance.now(),quiet=[],speak=[],done=false;
+    $('chkSaved').textContent='';$('chkLvl').textContent='';$('chkThr').style.display='none';
     CK.t=setInterval(function(){
       CK.an.getFloatTimeDomainData(CK.buf);var sm=0,i;for(i=0;i<CK.buf.length;i++)sm+=CK.buf[i]*CK.buf[i];
-      var r=Math.sqrt(sm/CK.buf.length);CK.lv=CK.lv*0.6+r*0.4;
-      $('chkBar').style.width=Math.min(100,CK.lv/0.12*100)+'%';
-      CK.peak.push(CK.lv);if(CK.peak.length>40)CK.peak.shift();
-      var m=Math.max.apply(null,CK.peak),e=$('chkLvl');
-      if(m<0.006){e.textContent='Nothing heard. Check that the right microphone is selected in Chrome.';e.className='ms r';}
-      else if(m<0.01){e.textContent='Too quiet. Speak up or move closer.';e.className='ms a';}
-      else if(m>0.15){e.textContent='Too loud. Move back a little.';e.className='ms a';}
-      else{e.textContent='Good level.';e.className='ms g';}
-    },80);
+      var r=Math.sqrt(sm/CK.buf.length),el=performance.now()-t0;CK.lv=CK.lv*0.6+r*0.4;
+      $('chkBar').style.width=(lvW(CK.lv)*100)+'%';
+      if(done)return;
+      if(el<2000){quiet.push(r);$('chkStep').textContent='Stay quiet for 2 seconds…';}
+      else if(el<8500){if(el>2500)speak.push(r);$('chkStep').textContent='Now say: “Good morning, I am ready for my interview.” ('+Math.ceil((8500-el)/1000)+')';}
+      else{
+        done=true;var m=micFromTest(quiet,speak),e=$('chkLvl');
+        if(!m){$('chkStep').textContent='I could not hear your voice.';e.textContent='Nothing was saved. Check that the right microphone is selected in Chrome, then try again.';e.className='ms r';return;}
+        m.t=Date.now();saveMic(m);showMicAge();
+        $('chkStep').textContent='✓ Saved. Start will use this level.';
+        $('chkThr').style.left=(lvW(m.thr)*100)+'%';$('chkThr').style.display='block';
+        if(m.ratio<4){e.textContent='Your voice is close to the room noise. Move the laptop a little closer or reduce noise, then test again.';e.className='ms a';}
+        else{e.textContent='Good. Your voice is clearly above the room noise.';e.className='ms g';}
+        $('chkSaved').textContent='The black line on the bar is your saved level. Speak now and the bar should pass the line. Only these numbers are saved, never audio. The level stays until you run a new test.';
+      }
+    },50);
   }).catch(function(){$('chkLvl').textContent='Microphone blocked. Click the lock icon next to the address bar and allow it.';$('chkLvl').className='ms r';});
 }
 function testSpeech(){
@@ -848,7 +948,7 @@ function testSpeech(){
 
 /* ---------- init ---------- */
 shuffleQ();S.qOrder=QUESTIONS.map(function(_,i){return i;});S.qIdx=0;setQ();
-bind();syncSettings();applyView();
+bind();syncSettings();applyView();showMicAge();setInterval(showMicAge,30000);
 (function(){
   var z=zonesFor(cfg.paceLo,cfg.paceHi),zd=$('zones').children;for(var i=0;i<5;i++)zd[i].style.width=(z.parts[i]*100)+'%';
   if(!SR()){showMsg('This tool needs Google Chrome (or Microsoft Edge) for speech recognition. Please open it in Chrome.',true);$('btnStart').disabled=true;}
