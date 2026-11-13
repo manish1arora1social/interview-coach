@@ -261,6 +261,10 @@ body.talkFlash .bar{width:12vw}body.talkHold .bar{width:6vw}
 <div class="hint" style="padding-top:8px">Say: “Good morning, I am ready for my interview.”</div>
 <div id="chkSay" style="font-size:16px;min-height:44px;padding:8px 0"></div>
 <p class="hint" style="line-height:1.6">When the level says Good and your sentence appears, you are ready. Close this panel, then press Start.</p>
+<div class="sr" style="margin-top:18px"><span>3. Test with a recording (silent)</span><button id="recBtn" class="quiet">Choose file</button></div>
+<input type="file" id="recFile" accept="audio/*,.mp3,.m4a,.aac,.wav" hidden>
+<div class="sr"><span>Speed</span><select id="recSpeed"><option value="1">Real time</option><option value="10" selected>10 times faster</option><option value="0">As fast as possible</option></select></div>
+<p class="hint" style="line-height:1.6">Nothing plays out loud and nothing leaves this laptop. It tests answer splits, the timer, the circle colours and the black screen. Words, pace and fillers stay empty, because Chrome only turns a live microphone into words. Your saved mic level is not changed.</p>
 </div>
 </div>
 
@@ -325,6 +329,7 @@ function paceBand(w,lo,hi){
   if(w>hi&&w<=hi+15)return 'fastish';
   return w<lo?'slow':'fast';
 }
+function clock(){return S.sim!=null?S.sim:performance.now();}
 function timerState(el,lim){return el<0.75*lim?'green':(el<lim?'amber':'red');}
 function stepFor(el,lim,multi){var p=el/lim;if(multi&&p>=1.5)return 'black';if(p>=1)return 'red';if(p>=0.75)return 'amber';if(multi&&p>=0.5)return 'blue';return 'green';}
 var MIN_THR=0.0012,DEF_THR=0.0035;
@@ -418,7 +423,7 @@ function startRec(){
 }
 function onResult(e){
   if(S.paused)return;
-  var now=performance.now();S.restartDelay=250;
+  var now=clock();S.restartDelay=250;
   if(!$('msg').hidden&&$('msg').className==='err'&&S.running)showMsg('');
   for(var i=e.resultIndex;i<e.results.length;i++){
     var res=e.results[i],text=res[0].transcript||'',key=S.epoch+':'+i;
@@ -441,7 +446,7 @@ function onResult(e){
 function reflow(el){void el.offsetWidth;}
 var CATN={A:'SOUNDS',B:'FILLERS',C:'HEDGES'};
 function fireWords(cat){
-  var now=performance.now();
+  var now=clock();
   S.hits.push({t:now,cat:cat});
   if(!cfg.cueWords)return;
   if(now-S.lastWordFire<900)return;
@@ -479,7 +484,7 @@ function vad(){
   if(!S.an||S.paused)return;
   S.an.getFloatTimeDomainData(S.buf);
   var sum=0,i;for(i=0;i<S.buf.length;i++){sum+=S.buf[i]*S.buf[i];}
-  var rms=Math.sqrt(sum/S.buf.length),now=performance.now();
+  var rms=Math.sqrt(sum/S.buf.length),now=clock();
   vadStep(rms,now);
 }
 /* The threshold comes from the saved mic test (or a safe default).
@@ -529,7 +534,7 @@ function onVoiceStart(t){
 function onVoiceEnd(endT){
   var b=S.burst;if(!b)return;
   var dur=Math.max(0,endT-b.s);
-  if(dur>=1500&&S.bN>=20&&S.tail.length>=4){var body=S.bSum/S.bN,tl=S.tail.reduce(function(x,y){return x+y;},0)/S.tail.length;b.ans.ends++;if(tl<0.55*body){b.ans.fades++;S.fadeLog.push(performance.now());}}
+  if(dur>=1500&&S.bN>=20&&S.tail.length>=4){var body=S.bSum/S.bN,tl=S.tail.reduce(function(x,y){return x+y;},0)/S.tail.length;b.ans.ends++;if(tl<0.55*body){b.ans.fades++;S.fadeLog.push(clock());}}
   S.lastVoiceEnd=endT;b.ans.lastVoiceEnd=endT;b.ans.voicedMs+=dur;S.totalVoiced+=dur;
   S.voicedLog.push([b.s,endT]);
   S.lastBurst={s:b.s,e:endT,dur:dur,gapBefore:b.gapBefore,ans:b.ans,counted:false};
@@ -538,10 +543,10 @@ function onVoiceEnd(endT){
 /* ---------- answers ---------- */
 function snapshot(a){
   var g=agg(a.id);
-  var now=performance.now();
+  var now=clock();
   var endT=a.lastVoiceEnd||now;
   var dur=a.start===null?0:Math.max(0,endT-a.start);
-  return {id:a.id,durMs:dur,short:dur<cfg.shortSec*1000,voicedMs:a.voicedMs,words:g.words,wpm:a.voicedMs>=3000?g.words/(a.voicedMs/60000):null,
+  return {id:a.id,durMs:dur,short:dur<cfg.shortSec*1000,voicedMs:a.voicedMs,words:g.words,wpm:a.voicedMs>=3000&&!S.recName?g.words/(a.voicedMs/60000):null,
     A:g.A,B:g.B,C:g.C,I:g.I,W:g.W,N:g.N,longPauses:a.longPauses,hes:a.hes,ends:a.ends,fades:a.fades,reps:g.reps,text:g.text.join(' ')};
 }
 function finalizeCur(){
@@ -554,22 +559,22 @@ function newAnswer(manual){
   if(manual&&a&&a.start===null&&agg(a.id).words===0){return;}
   finalizeCur();
   S.cur=newAns();S.wordEvents=[];S.voicedLog=[];S.hits=[];S.fadeLog=[];S.wpmEma=null;
-  if(S.voiced){S.cur.start=performance.now();if(S.burst)S.burst.ans=S.cur;}
+  if(S.voiced){S.cur.start=clock();if(S.burst)S.burst.ans=S.cur;}
   clearTalk();clearWords();showLand(false);
   $('circle').className='st-idle';
   renderTrans();
 }
 function elapsed(){
   var a=S.cur;if(!a||a.start===null)return 0;
-  var now=performance.now();
+  var now=clock();
   return Math.max(0,(isEnded()?(a.lastVoiceEnd||now):now)-a.start);
 }
 function isEnded(){
   var a=S.cur;if(!a||a.start===null||S.voiced||!S.lastVoiceEnd)return false;
-  return performance.now()-S.lastVoiceEnd>=cfg.silenceSec*1000;
+  return clock()-S.lastVoiceEnd>=cfg.silenceSec*1000;
 }
 function wpmNow(){
-  var now=performance.now(),w0=now-20000,words=0,voiced=0;
+  var now=clock(),w0=now-20000,words=0,voiced=0;
   S.wordEvents.forEach(function(e){if(e.t>=w0)words+=e.n;});
   S.voicedLog.forEach(function(p){if(p[1]>w0)voiced+=p[1]-Math.max(p[0],w0);});
   if(S.voiced)voiced+=now-Math.max(S.voiceStart,w0);
@@ -583,7 +588,7 @@ function wpmNow(){
 function tick(){
   if(!S.running)return;
   if(S.paused){showLand(false);var pe=(S.cur&&S.cur.start!==null)?Math.max(0,(S.cur.lastVoiceEnd||S.pauseAt)-S.cur.start):0;$('timer').textContent=fmt(pe);$('state').textContent='Paused · press P to resume';$('state').className='';setCue('');return;}
-  var now=performance.now(),a=S.cur;
+  var now=clock(),a=S.cur;
   S.wordEvents=S.wordEvents.filter(function(e){return now-e.t<60000;});
   S.voicedLog=S.voicedLog.filter(function(p){return now-p[1]<60000;});
   S.hits=S.hits.filter(function(h){return now-h.t<15000;});
@@ -706,13 +711,10 @@ function startSession(){
     S.stream=stream;try{S.ctx.resume();}catch(e){}
     var src=S.ctx.createMediaStreamSource(stream);S.an=S.ctx.createAnalyser();S.an.fftSize=2048;S.an.smoothingTimeConstant=0;
     src.connect(S.an);S.buf=new Float32Array(S.an.fftSize);
-    S.segs={};S.answers=[];S.nextId=1;S.cur=newAns();S.wordEvents=[];S.voicedLog=[];S.hits=[];
-    S.totalWords=0;S.totalVoiced=0;S.lastVoiceEnd=0;S.voiced=false;S.burst=null;S.lastBurst=null;S.lvl=[];S.rq=[];S.lastLoud=0;S.lastLower=0;S.hang=0;
-    var mic=loadMic();S.thr=mic?mic.thr:DEF_THR;S.micVoice=mic?mic.voice:0;
+    var mic=loadMic();S.recName=null;
+    initRun(mic?mic.thr:DEF_THR,mic?mic.voice:0);
     if(!mic)showMsg('Mic not checked. Using a safe default level. Run Check setup before your next session for the best results.');
-    S.running=true;S.paused=false;lockScreen();S.sessionStart=Date.now();
-    $('btnStart').textContent='Stop';$('status').className='status on';$('statusTxt').textContent='Listening';
-    $('summary').hidden=true;$('main').hidden=false;if(mic)showMsg('');renderTrans();
+    else showMsg('');
     S.vadT=setInterval(vad,50);S.tickT=setInterval(tick,200);
     startRec();
   }).catch(function(){
@@ -720,9 +722,45 @@ function startSession(){
     showMsg('The microphone is blocked or missing. Click the lock icon next to the address bar, allow the microphone, then press Start again.',true);
   });
 }
+function initRun(thr,voice){
+  S.segs={};S.answers=[];S.nextId=1;S.cur=newAns();S.wordEvents=[];S.voicedLog=[];S.hits=[];
+  S.totalWords=0;S.totalVoiced=0;S.lastVoiceEnd=0;S.voiced=false;S.burst=null;S.lastBurst=null;S.lvl=[];S.rq=[];S.lastLoud=0;S.lastLower=0;S.hang=0;
+  S.thr=thr;S.micVoice=voice;
+  S.running=true;S.paused=false;lockScreen();S.sessionStart=Date.now();
+  $('btnStart').textContent='Stop';$('status').className='status on';$('statusTxt').textContent='Listening';
+  $('summary').hidden=true;$('main').hidden=false;renderTrans();
+}
+/* ---------- test with a recording: read a file silently, nothing plays out loud ---------- */
+function runRecording(file){
+  if(S.running){showMsg('Stop the session first, then test a recording.',true);return;}
+  $('check').hidden=true;showMsg('Reading the recording… this can take a few seconds for a long file.');
+  var AC=window.AudioContext||window.webkitAudioContext,dc=new AC();
+  file.arrayBuffer().then(function(b){return dc.decodeAudioData(b);}).then(function(ab){
+    try{dc.close();}catch(e){}
+    var sr=ab.sampleRate,len=ab.length,chs=[],c;for(c=0;c<ab.numberOfChannels;c++)chs.push(ab.getChannelData(c));
+    var hop=Math.round(sr*0.05),win=Math.round(sr*0.043),n=Math.floor((len-win)/hop),rms=new Float32Array(Math.max(0,n)),i,j,x,sm;
+    for(i=0;i<n;i++){sm=0;for(j=i*hop;j<i*hop+win;j++){x=0;for(c=0;c<chs.length;c++)x+=chs[c][j];x/=chs.length;sm+=x*x;}rms[i]=Math.sqrt(sm/win);}
+    if(n<20){showMsg('This recording is too short to test.',true);return;}
+    var all=Array.prototype.slice.call(rms),srt=all.slice().sort(function(a,b){return a-b;});
+    var m=micFromTest(srt.slice(0,Math.max(5,Math.floor(n*0.2))),all);
+    S.sim=0;S.recName=file.name;
+    initRun(m?m.thr:DEF_THR,m?m.voice:0);
+    showMsg('Testing "'+file.name+'" silently. Words, pace and fillers stay empty, because Chrome only turns a live microphone into words. Press S to stop early.');
+    var speed=+$('recSpeed').value,pos=0,last=performance.now(),total=fmt(n*50);
+    (function step(){
+      if(!S.running||S.sim==null)return;
+      var rn=performance.now(),dt=rn-last;last=rn;
+      var todo=S.paused?0:(speed?Math.round(dt*speed/50):1200);
+      for(var k=0;k<todo&&pos<n;k++,pos++){S.sim=pos*50;vadStep(rms[pos],S.sim);if(pos%4===0)tick();}
+      if(S.running)$('statusTxt').textContent='Recording test '+fmt(pos*50)+' / '+total;
+      if(pos>=n){S.sim=n*50;stopSession(false);return;}
+      S.recT=setTimeout(step,speed?50:0);
+    })();
+  }).catch(function(){try{dc.close();}catch(e){}S.sim=null;showMsg('Chrome could not read this file. Try an MP3, M4A or WAV file.',true);});
+}
 function stopSession(silent){
   var was=S.running;S.running=false;
-  clearInterval(S.vadT);clearInterval(S.tickT);
+  clearInterval(S.vadT);clearInterval(S.tickT);clearTimeout(S.recT);
   if(S.rec){S.rec.onend=null;try{S.rec.abort();}catch(e){}S.rec=null;}
   if(S.stream){S.stream.getTracks().forEach(function(t){t.stop();});S.stream=null;}
   if(S.ctx){try{S.ctx.close();}catch(e){}S.ctx=null;}
@@ -731,6 +769,7 @@ function stopSession(silent){
   $('btnStart').textContent='Start';$('status').className='status';$('statusTxt').textContent='Not listening';
   setCue('');$('state').textContent='Press Start (S)';$('state').className='';
   if(was){finalizeCur();if(!silent&&S.answers.length)showSummary();}
+  S.sim=null;
 }
 function toggleSession(){if(S.running)stopSession(false);else startSession();}
 
@@ -744,7 +783,7 @@ function summarise(){
   var I=sum(function(a){return a.I;}),W=sum(function(a){return a.W;});
   var E=sum(function(a){return a.ends;}),F=sum(function(a){return a.fades;});
   return {n:n,nShort:nShort,avgMs:totMs/n,longestMs:Math.max.apply(null,A.map(function(a){return a.durMs;})),over2:A.filter(function(a){return a.durMs>120000;}).length,
-    avgWpm:voiced>0?words/(voiced/60000):0,fillPerMin:sum(function(a){return a.A+a.B;})/mins,hedgePerMin:sum(function(a){return a.C;})/mins,
+    avgWpm:voiced>0&&words>0?words/(voiced/60000):0,fillPerMin:sum(function(a){return a.A+a.B;})/mins,hedgePerMin:sum(function(a){return a.C;})/mins,
     wePct:(I+W)?W/(I+W)*100:0,fadePct:E>=5?F/E*100:0,noNum:A.filter(function(a){return a.N===0;}).length,hesPerMin:sum(function(a){return a.hes;})/mins,
     limMs:cfg.tlMin*60000,lo:cfg.paceLo,hi:cfg.paceHi,I:I,W:W};
 }
@@ -753,8 +792,8 @@ function showSummary(){
   $('main').hidden=true;$('summary').hidden=false;
   var g=$('sg');g.textContent='';
   [['Answers',s.n,s.nShort?'+ '+s.nShort+' short replies':''],['Average length',fmt(s.avgMs),''],['Longest',fmt(s.longestMs),''],['Over 2 minutes',s.over2,s.over2?'Too long':''],
-   ['Average pace',Math.round(s.avgWpm)+' wpm',''],['Fillers per minute',s.fillPerMin.toFixed(1),''],['Hedges per minute',s.hedgePerMin.toFixed(1),''],
-   ['“I” versus “we”',Math.round(100-s.wePct)+' / '+Math.round(s.wePct),s.wePct>50?'Too many “we”':'']].forEach(function(r){
+   ['Average pace',s.avgWpm?Math.round(s.avgWpm)+' wpm':'–',''],['Fillers per minute',s.fillPerMin.toFixed(1),''],['Hedges per minute',s.hedgePerMin.toFixed(1),''],
+   ['“I” versus “we”',(s.I+s.W)?Math.round(100-s.wePct)+' / '+Math.round(s.wePct):'–',s.wePct>50?'Too many “we”':'']].forEach(function(r){
     var d=document.createElement('div');d.innerHTML='<div class="k"></div><div class="v"></div>';
     d.firstChild.textContent=r[0];d.lastChild.textContent=r[1]+' ';
     if(r[2]){var sm=document.createElement('small');sm.style.color='var(--aT)';sm.textContent=r[2];d.lastChild.appendChild(sm);}
@@ -774,6 +813,7 @@ function reportText(){
   var L=[];
   L.push('INTERVIEW DELIVERY COACH REPORT');L.push(new Date().toLocaleString('en-GB'));L.push('');
   L.push('Answers: '+s.n+' (plus '+s.nShort+' short replies under '+cfg.shortSec+' seconds, left out of the averages)');
+  if(S.recName)L.push('Source: recording test of "'+S.recName+'". Words, pace and fillers are empty because Chrome only turns a live microphone into words.');
   var mic=loadMic();L.push('Mic check: '+(mic?ago(Date.now()-mic.t)+' before the report':'not run, default level used')+' · Answer limit: '+cfg.tlMin+' min · New answer after '+cfg.silenceSec+' s of silence');L.push('Average length: '+fmt(s.avgMs)+' · Longest: '+fmt(s.longestMs)+' · Over 2 minutes: '+s.over2);
   L.push('Average pace: '+Math.round(s.avgWpm)+' wpm · Fillers per minute: '+s.fillPerMin.toFixed(1)+' · Hedges per minute: '+s.hedgePerMin.toFixed(1));
   L.push('I versus we: '+s.I+' / '+s.W+' · Answers with no numbers: '+s.noNum);L.push('');
@@ -838,6 +878,8 @@ function bind(){
   $('btnPause').addEventListener('click',function(){this.blur();togglePause();});
   $('btnCheck').addEventListener('click',function(){this.blur();openCheck();});
   $('micAge').addEventListener('click',function(){this.blur();openCheck();});
+  $('recBtn').addEventListener('click',function(){this.blur();$('recFile').value='';$('recFile').click();});
+  $('recFile').addEventListener('change',function(){var f=this.files&&this.files[0];if(f){closeCheck();runRecording(f);}});
   $('btnFull').addEventListener('click',function(){this.blur();toggleFull();});
   $('chkClose').addEventListener('click',closeCheck);$('chkMic').addEventListener('click',testMic);$('chkSpeech').addEventListener('click',testSpeech);
   $('check').addEventListener('click',function(e){if(e.target===$('check'))closeCheck();});
@@ -847,7 +889,7 @@ function bind(){
   $('btnClose').addEventListener('click',function(){$('settings').hidden=true;});
   $('settings').addEventListener('click',function(e){if(e.target===$('settings'))$('settings').hidden=true;});
   $('btnReset').addEventListener('click',function(){cfg=Object.assign({},DEF);saveCfg();syncSettings();applyView();});
-  function measure(){this.blur();if(!S.running){$('measureOut').textContent='Press Start first, then measure.';$('settings').hidden=false;return;}S.calib={t0:performance.now(),w0:S.totalWords,v0:S.totalVoiced+(S.voiced?performance.now()-S.voiceStart:0)};$('settings').hidden=false;}
+  function measure(){this.blur();if(!S.running){$('measureOut').textContent='Press Start first, then measure.';$('settings').hidden=false;return;}S.calib={t0:clock(),w0:S.totalWords,v0:S.totalVoiced+(S.voiced?clock()-S.voiceStart:0)};$('settings').hidden=false;}
   $('btnMeasure').addEventListener('click',measure);$('btnMeasure2').addEventListener('click',measure);
   $('btnNext').addEventListener('click',nextQ);$('btnShuffle').addEventListener('click',shuffleQ);
   $('btnBack').addEventListener('click',function(){$('summary').hidden=true;$('main').hidden=false;});
@@ -873,7 +915,7 @@ function bind(){
 /* ---------- pause, wake lock, full screen, setup check ---------- */
 function togglePause(){
   if(!S.running)return;
-  var now=performance.now();
+  var now=clock();
   if(!S.paused){
     S.paused=true;S.pauseAt=now;
     if(S.voiced){S.voiced=false;onVoiceEnd(now);}
@@ -915,11 +957,11 @@ function testMic(){
   navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:false}}).then(function(st){
     CK.stream=st;var src=CK.ctx.createMediaStreamSource(st);CK.an=CK.ctx.createAnalyser();CK.an.fftSize=2048;src.connect(CK.an);
     CK.buf=new Float32Array(2048);CK.lv=0;
-    var t0=performance.now(),quiet=[],speak=[],done=false;
+    var t0=clock(),quiet=[],speak=[],done=false;
     $('chkSaved').textContent='';$('chkLvl').textContent='';$('chkThr').style.display='none';
     CK.t=setInterval(function(){
       CK.an.getFloatTimeDomainData(CK.buf);var sm=0,i;for(i=0;i<CK.buf.length;i++)sm+=CK.buf[i]*CK.buf[i];
-      var r=Math.sqrt(sm/CK.buf.length),el=performance.now()-t0;CK.lv=CK.lv*0.6+r*0.4;
+      var r=Math.sqrt(sm/CK.buf.length),el=clock()-t0;CK.lv=CK.lv*0.6+r*0.4;
       $('chkBar').style.width=(lvW(CK.lv)*100)+'%';
       if(done)return;
       if(el<2000){quiet.push(r);$('chkStep').textContent='Stay quiet for 2 seconds…';}
