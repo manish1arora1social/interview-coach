@@ -74,6 +74,7 @@ header{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-cont
 #circle.st-blue{background:#4FB3E8;color:#0B1A26}
 #circle.st-amber{background:#E58A00;color:#161513}
 #circle.st-red{background:#D32F2F;color:#fff}
+#circle.st-sip{background:#8C8780;color:#fff;box-shadow:0 0 0 6px #8C8780,0 0 0 9px var(--bg),0 0 0 12px #8C8780}
 #circle.st-black{background:#000;color:#fff;box-shadow:0 0 0 8px #fff,0 0 0 12px #000}
 #circle.pulse{animation:cpulse 1.2s ease-in-out 1}
 #circle.spulse{animation:spulse 2.2s ease-in-out 1}
@@ -181,7 +182,7 @@ body.talkFlash .bar{width:12vw}body.talkHold .bar{width:6vw}
 <div id="ans">Answer 1</div>
 <div id="circle" class="st-idle"><span id="timer">0:00</span></div>
 <div id="state">Press Start (S)</div>
-<div class="cbtns"><button id="btnNew">New answer (Space)</button><button id="btnPause" class="quiet">Pause (P)</button><button id="btnMeasure" class="quiet">Measure my pace</button></div>
+<div class="cbtns"><button id="btnNew">New answer (Space)</button><button id="btnPause" class="quiet">Pause (Ctrl)</button><button id="btnSip" class="quiet">Sip break (→)</button><button id="btnMeasure" class="quiet">Measure my pace</button></div>
 </section>
 <section id="metrics">
 <div class="m"><div><div class="ml">Pace</div><div class="ms n" id="s_pace">Waiting for speech</div></div><div class="mv"><span id="v_pace">–</span> <small>wpm</small></div></div>
@@ -207,7 +208,7 @@ body.talkFlash .bar{width:12vw}body.talkHold .bar{width:6vw}
 </div>
 </div>
 </div>
-<footer><span>Space new answer · S start/stop · P pause · F full screen · Q quiet · C compact · T transcript</span><span>Nothing is recorded or saved unless you click Download report</span></footer>
+<footer><span>Space new answer · Ctrl or P pause · → sip break · S start/stop · F full screen · Q quiet · C compact · T transcript</span><span>Nothing is recorded or saved unless you click Download report</span></footer>
 </div>
 
 <section id="summary" hidden>
@@ -372,7 +373,11 @@ function loadCfg(){var c=Object.assign({},DEF);try{var r=localStorage.getItem('i
   Object.keys(DEF).forEach(function(k){if(o[k]!==undefined&&typeof o[k]===typeof DEF[k])c[k]=o[k];});}}catch(e){}return c;}
 function saveCfg(){try{localStorage.setItem('ic_cfg',JSON.stringify(cfg));}catch(e){}}
 /* saved mic level: numbers only, never audio */
-function loadMic(){try{var m=JSON.parse(localStorage.getItem('ic_mic')||'null');if(m&&typeof m.thr==='number'&&typeof m.t==='number')return m;}catch(e){}return null;}
+function loadMic(){try{var m=JSON.parse(localStorage.getItem('ic_mic')||'null');if(m&&m.f===1&&typeof m.thr==='number'&&typeof m.t==='number')return m;}catch(e){}return null;}
+/* voice band: ignore deep rumble and high sounds such as birds, keys and clicks */
+function voiceBand(ctx,src){var hp=ctx.createBiquadFilter();hp.type='highpass';hp.frequency.value=90;
+  var l1=ctx.createBiquadFilter();l1.type='lowpass';l1.frequency.value=1100;var l2=ctx.createBiquadFilter();l2.type='lowpass';l2.frequency.value=1100;
+  src.connect(hp);hp.connect(l1);l1.connect(l2);return l2;}
 function saveMic(m){try{localStorage.setItem('ic_mic',JSON.stringify(m));}catch(e){}}
 var $=function(id){return document.getElementById(id);};
 function ago(ms){var m=Math.floor(ms/60000);if(m<1)return 'just now';if(m<60)return m+' min ago';var h=Math.floor(m/60);if(h<48)return h+' h ago';return Math.floor(h/24)+' days ago';}
@@ -386,7 +391,7 @@ var S={running:false,rec:null,epoch:0,segs:{},answers:[],cur:null,nextId:1,ctx:n
  voiced:false,voiceStart:0,lastVoiceEnd:0,hang:0,floor:0.004,level:0,lvl:[],voicedLog:[],wordEvents:[],wpmEma:null,paused:false,pauseAt:0,wl:null,bSum:0,bN:0,tail:[],fadeLog:[],totalWords:0,totalVoiced:0,
  burst:null,lastBurst:null,lastWordFire:0,hits:[],cueText:'',restartDelay:250,calib:null,qOrder:[],qIdx:0,wT1:null,wT2:null,wT3:null,tT:null,lastTr:0,sessionStart:0,
  thr:DEF_THR,micVoice:0,rq:[],lastLoud:0,lastLower:0};
-var HANG=700;
+var HANG=700,SHORT_MS=1500,SIP_MAX=60000;
 
 function newAns(){return {id:S.nextId++,start:null,lastVoiceEnd:null,voicedMs:0,longPauses:0,hes:0,ends:0,fades:0,redFired:false,nextPulse:0,step:'green'};}
 
@@ -481,11 +486,39 @@ function clearTalk(){clearTimeout(S.tT);var b=document.body;b.classList.remove('
 
 /* ---------- audio / voice activity ---------- */
 function vad(){
-  if(!S.an||S.paused)return;
+  if(!S.an)return;
   S.an.getFloatTimeDomainData(S.buf);
   var sum=0,i;for(i=0;i<S.buf.length;i++){sum+=S.buf[i]*S.buf[i];}
   var rms=Math.sqrt(sum/S.buf.length),now=clock();
+  if(S.paused){pauseWatch(rms,now);return;}
   vadStep(rms,now);
+}
+/* backup if you forget to resume: 3 s of voice within any 5 s while paused resumes listening */
+function pauseWatch(rms,now){
+  S.level=S.level*0.7+rms*0.3;
+  if(rms>S.thr)S.pvHang=now+HANG;
+  if(!S.pvb)S.pvb=[];S.pvb.push(now<(S.pvHang||0)?1:0);if(S.pvb.length>100)S.pvb.shift();
+  var on=S.pvb.reduce(function(x,y){return x+y;},0);
+  if(on>=60){S.pvb=[];togglePause();showMsg('Resumed by itself because you were speaking. Press Ctrl or P to pause again.');}
+}
+function toggleSip(){
+  if(!S.running||S.paused)return;
+  if(S.sip){endSip(clock());return;}
+  var a=S.cur;if(!a||a.start===null)return;
+  var now=clock();
+  if(S.voiced){S.voiced=false;onVoiceEnd(now);}
+  S.hang=0;S.sip={at:now,vs:0};S.sips++;
+  clearTalk();clearWords();showLand(false);
+  $('statusTxt').textContent='Sip break';
+}
+function endSip(t){
+  if(!S.sip)return;
+  var d=Math.max(0,t-S.sip.at);S.sip=null;
+  /* the break does not count towards the answer's time, and does not end the answer */
+  if(S.cur.start!==null){S.cur.start+=d;S.cur.shift=(S.cur.shift||0)+d;}
+  if(S.cur.lastVoiceEnd)S.cur.lastVoiceEnd+=d;
+  if(S.lastVoiceEnd)S.lastVoiceEnd+=d;
+  $('statusTxt').textContent=S.recName?'Recording test':'Listening';
 }
 /* The threshold comes from the saved mic test (or a safe default).
    It is NEVER raised while running. It can only be lowered:
@@ -502,6 +535,13 @@ function vadStep(rms,now){
     if(target<S.thr){S.thr=Math.max(target,S.thr*0.85);S.lastLower=now;}
   }
   var v=loud||now<S.hang;
+  if(S.sip){
+    /* sip break: ignore gulps; 1 s of steady voice means you are talking again */
+    if(v){if(!S.sip.vs)S.sip.vs=now;}else S.sip.vs=0;
+    if(S.sip.vs&&now-S.sip.vs>=1000)endSip(S.sip.vs);
+    else if(now-S.sip.at>=SIP_MAX){endSip(now);showMsg('Sip break ended by itself after 60 seconds.');}
+    if(S.sip)return;
+  }
   if(v&&!S.voiced){S.voiced=true;S.voiceStart=now;onVoiceStart(now);}
   else if(!v&&S.voiced){S.voiced=false;onVoiceEnd(S.hang-HANG);}
   if(loud&&S.voiced){S.bSum+=rms;S.bN++;S.tail.push(rms);if(S.tail.length>6)S.tail.shift();}
@@ -515,7 +555,9 @@ function wordsHeard(now){
     var bound=Math.max(MIN_THR,pct(S.rq,0.2)*2.5);
     if(S.thr*0.9>=bound){S.thr*=0.9;S.lastLower=now;}
   }
+  if(S.sip){endSip(now-300);}
   if(!S.voiced){S.voiced=true;S.voiceStart=now-300;onVoiceStart(now-300);}
+  if(S.burst)S.burst.words=true;
   S.hang=Math.max(S.hang,now+900);
 }
 function finalizeBurst(gapAfter){
@@ -529,13 +571,15 @@ function onVoiceStart(t){
   if(a.start===null){a.start=t;}
   else if(gap>=cfg.silenceSec*1000){newAnswer(false);S.cur.start=t;a=S.cur;}
   else if(gap>=3000){a.longPauses++;}
-  S.burst={s:t,gapBefore:gap,ans:a};S.bSum=0;S.bN=0;S.tail=[];
+  S.burst={s:t,gapBefore:gap,ans:a,words:false};S.bSum=0;S.bN=0;S.tail=[];
 }
 function onVoiceEnd(endT){
   var b=S.burst;if(!b)return;
   var dur=Math.max(0,endT-b.s);
   if(dur>=1500&&S.bN>=20&&S.tail.length>=4){var body=S.bSum/S.bN,tl=S.tail.reduce(function(x,y){return x+y;},0)/S.tail.length;b.ans.ends++;if(tl<0.55*body){b.ans.fades++;S.fadeLog.push(clock());}}
-  S.lastVoiceEnd=endT;b.ans.lastVoiceEnd=endT;b.ans.voicedMs+=dur;S.totalVoiced+=dur;
+  /* only real speech moves the answer's end: a short "Mhmm" or a bird chirp does not */
+  if(dur>=SHORT_MS||b.words||!b.ans.lastVoiceEnd){S.lastVoiceEnd=endT;b.ans.lastVoiceEnd=endT;}
+  b.ans.voicedMs+=dur;S.totalVoiced+=dur;
   S.voicedLog.push([b.s,endT]);
   S.lastBurst={s:b.s,e:endT,dur:dur,gapBefore:b.gapBefore,ans:b.ans,counted:false};
 }
@@ -546,7 +590,7 @@ function snapshot(a){
   var now=clock();
   var endT=a.lastVoiceEnd||now;
   var dur=a.start===null?0:Math.max(0,endT-a.start);
-  return {id:a.id,durMs:dur,short:dur<cfg.shortSec*1000,voicedMs:a.voicedMs,words:g.words,wpm:a.voicedMs>=3000&&!S.recName?g.words/(a.voicedMs/60000):null,
+  return {id:a.id,at:a.start===null?null:a.start-(a.shift||0)-S.t0,durMs:dur,short:dur<cfg.shortSec*1000,voicedMs:a.voicedMs,words:g.words,wpm:a.voicedMs>=3000&&!S.recName?g.words/(a.voicedMs/60000):null,
     A:g.A,B:g.B,C:g.C,I:g.I,W:g.W,N:g.N,longPauses:a.longPauses,hes:a.hes,ends:a.ends,fades:a.fades,reps:g.reps,text:g.text.join(' ')};
 }
 function finalizeCur(){
@@ -570,7 +614,9 @@ function elapsed(){
   return Math.max(0,(isEnded()?(a.lastVoiceEnd||now):now)-a.start);
 }
 function isEnded(){
-  var a=S.cur;if(!a||a.start===null||S.voiced||!S.lastVoiceEnd)return false;
+  var a=S.cur;if(!a||a.start===null||!S.lastVoiceEnd)return false;
+  if(S.sip)return false;
+  if(S.voiced&&(clock()-S.voiceStart>=SHORT_MS||(S.burst&&S.burst.words)))return false;
   return clock()-S.lastVoiceEnd>=cfg.silenceSec*1000;
 }
 function wpmNow(){
@@ -587,7 +633,8 @@ function wpmNow(){
 /* ---------- main tick ---------- */
 function tick(){
   if(!S.running)return;
-  if(S.paused){showLand(false);var pe=(S.cur&&S.cur.start!==null)?Math.max(0,(S.cur.lastVoiceEnd||S.pauseAt)-S.cur.start):0;$('timer').textContent=fmt(pe);$('state').textContent='Paused · press P to resume';$('state').className='';setCue('');return;}
+  if(S.sip&&S.cur&&S.cur.start!==null){showLand(false);var se=Math.max(0,S.sip.at-S.cur.start);$('timer').textContent=fmt(se);$('circle').className='st-sip';$('state').textContent='Sip break · just start speaking to continue';$('state').className='';setCue('');return;}
+  if(S.paused){showLand(false);var pe=(S.cur&&S.cur.start!==null)?Math.max(0,(S.cur.lastVoiceEnd||S.pauseAt)-S.cur.start):0;$('timer').textContent=fmt(pe);$('state').textContent='Paused · press Ctrl to resume, or just speak';$('state').className='';setCue('');return;}
   var now=clock(),a=S.cur;
   S.wordEvents=S.wordEvents.filter(function(e){return now-e.t<60000;});
   S.voicedLog=S.voicedLog.filter(function(p){return now-p[1]<60000;});
@@ -710,7 +757,7 @@ function startSession(){
   navigator.mediaDevices.getUserMedia(cs).then(function(stream){
     S.stream=stream;try{S.ctx.resume();}catch(e){}
     var src=S.ctx.createMediaStreamSource(stream);S.an=S.ctx.createAnalyser();S.an.fftSize=2048;S.an.smoothingTimeConstant=0;
-    src.connect(S.an);S.buf=new Float32Array(S.an.fftSize);
+    voiceBand(S.ctx,src).connect(S.an);S.buf=new Float32Array(S.an.fftSize);
     var mic=loadMic();S.recName=null;
     initRun(mic?mic.thr:DEF_THR,mic?mic.voice:0);
     if(!mic)showMsg('Mic not checked. Using a safe default level. Run Check setup before your next session for the best results.');
@@ -725,7 +772,7 @@ function startSession(){
 function initRun(thr,voice){
   S.segs={};S.answers=[];S.nextId=1;S.cur=newAns();S.wordEvents=[];S.voicedLog=[];S.hits=[];
   S.totalWords=0;S.totalVoiced=0;S.lastVoiceEnd=0;S.voiced=false;S.burst=null;S.lastBurst=null;S.lvl=[];S.rq=[];S.lastLoud=0;S.lastLower=0;S.hang=0;
-  S.thr=thr;S.micVoice=voice;
+  S.thr=thr;S.micVoice=voice;S.t0=clock();S.sip=null;S.pv=0;S.sips=0;
   S.running=true;S.paused=false;lockScreen();S.sessionStart=Date.now();
   $('btnStart').textContent='Stop';$('status').className='status on';$('statusTxt').textContent='Listening';
   $('summary').hidden=true;$('main').hidden=false;renderTrans();
@@ -735,8 +782,12 @@ function runRecording(file){
   if(S.running){showMsg('Stop the session first, then test a recording.',true);return;}
   $('check').hidden=true;showMsg('Reading the recording… this can take a few seconds for a long file.');
   var AC=window.AudioContext||window.webkitAudioContext,dc=new AC();
-  file.arrayBuffer().then(function(b){return dc.decodeAudioData(b);}).then(function(ab){
+  file.arrayBuffer().then(function(b){return dc.decodeAudioData(b);}).then(function(raw){
     try{dc.close();}catch(e){}
+    var OC=window.OfflineAudioContext||window.webkitOfflineAudioContext,oc=new OC(1,raw.length,raw.sampleRate);
+    var bs=oc.createBufferSource();bs.buffer=raw;voiceBand(oc,bs).connect(oc.destination);bs.start(0);
+    return oc.startRendering();
+  }).then(function(ab){
     var sr=ab.sampleRate,len=ab.length,chs=[],c;for(c=0;c<ab.numberOfChannels;c++)chs.push(ab.getChannelData(c));
     var hop=Math.round(sr*0.05),win=Math.round(sr*0.043),n=Math.floor((len-win)/hop),rms=new Float32Array(Math.max(0,n)),i,j,x,sm;
     for(i=0;i<n;i++){sm=0;for(j=i*hop;j<i*hop+win;j++){x=0;for(c=0;c<chs.length;c++)x+=chs[c][j];x/=chs.length;sm+=x*x;}rms[i]=Math.sqrt(sm/win);}
@@ -764,7 +815,7 @@ function stopSession(silent){
   if(S.rec){S.rec.onend=null;try{S.rec.abort();}catch(e){}S.rec=null;}
   if(S.stream){S.stream.getTracks().forEach(function(t){t.stop();});S.stream=null;}
   if(S.ctx){try{S.ctx.close();}catch(e){}S.ctx=null;}
-  S.an=null;S.calib=null;S.paused=false;unlockScreen();$('btnPause').textContent='Pause (P)';
+  S.an=null;S.calib=null;S.paused=false;unlockScreen();$('btnPause').textContent='Pause (Ctrl)';
   clearTalk();clearWords();showLand(false);$('speed').hidden=true;
   $('btnStart').textContent='Start';$('status').className='status';$('statusTxt').textContent='Not listening';
   setCue('');$('state').textContent='Press Start (S)';$('state').className='';
@@ -802,7 +853,7 @@ function showSummary(){
   S.answers.forEach(function(a,i){
     var tr=document.createElement('tr');
     if(a.short)tr.style.color='var(--muted)';
-    [i+1,fmt(a.durMs)+(a.short?' short':''),a.wpm===null?'–':Math.round(a.wpm),a.A+a.B,a.C,a.I+' / '+a.W,a.N?a.N:'None',a.longPauses,a.hes,a.ends?a.fades+' of '+a.ends:'–'].forEach(function(v){var td=document.createElement('td');td.textContent=v;tr.appendChild(td);});
+    [(i+1)+(a.at==null?'':' · '+fmt(a.at)),fmt(a.durMs)+(a.short?' short':''),a.wpm===null?'–':Math.round(a.wpm),a.A+a.B,a.C,a.I+' / '+a.W,a.N?a.N:'None',a.longPauses,a.hes,a.ends?a.fades+' of '+a.ends:'–'].forEach(function(v){var td=document.createElement('td');td.textContent=v;tr.appendChild(td);});
     tb.appendChild(tr);});
   var ol=$('top3');ol.textContent='';
   top3(s).forEach(function(t){var li=document.createElement('li');li.textContent=t;ol.appendChild(li);});
@@ -813,15 +864,16 @@ function reportText(){
   var L=[];
   L.push('INTERVIEW DELIVERY COACH REPORT');L.push(new Date().toLocaleString('en-GB'));L.push('');
   L.push('Answers: '+s.n+' (plus '+s.nShort+' short replies under '+cfg.shortSec+' seconds, left out of the averages)');
+  L.push('Sip breaks: '+(S.sips||0)+' (they do not count towards answer time)');
   if(S.recName)L.push('Source: recording test of "'+S.recName+'". Words, pace and fillers are empty because Chrome only turns a live microphone into words.');
   var mic=loadMic();L.push('Mic check: '+(mic?ago(Date.now()-mic.t)+' before the report':'not run, default level used')+' · Answer limit: '+cfg.tlMin+' min · New answer after '+cfg.silenceSec+' s of silence');L.push('Average length: '+fmt(s.avgMs)+' · Longest: '+fmt(s.longestMs)+' · Over 2 minutes: '+s.over2);
   L.push('Average pace: '+Math.round(s.avgWpm)+' wpm · Fillers per minute: '+s.fillPerMin.toFixed(1)+' · Hedges per minute: '+s.hedgePerMin.toFixed(1));
   L.push('I versus we: '+s.I+' / '+s.W+' · Answers with no numbers: '+s.noNum);L.push('');
   L.push('PER ANSWER');
-  S.answers.forEach(function(a,i){L.push((i+1)+'. '+fmt(a.durMs)+(a.short?' (short reply)':'')+' | pace '+(a.wpm===null?'-':Math.round(a.wpm))+' | fillers '+(a.A+a.B)+' | hedges '+a.C+' | I/we '+a.I+'/'+a.W+' | numbers '+a.N+' | long pauses '+a.longPauses+' | hesitations (est.) '+a.hes+' | faded endings '+a.fades+'/'+a.ends);});
+  S.answers.forEach(function(a,i){L.push((i+1)+'. starts '+(a.at==null?'-':fmt(a.at))+' | '+fmt(a.durMs)+(a.short?' (short reply)':'')+' | pace '+(a.wpm===null?'-':Math.round(a.wpm))+' | fillers '+(a.A+a.B)+' | hedges '+a.C+' | I/we '+a.I+'/'+a.W+' | numbers '+a.N+' | long pauses '+a.longPauses+' | hesitations (est.) '+a.hes+' | faded endings '+a.fades+'/'+a.ends);});
   L.push('');L.push('TOP THREE THINGS TO IMPROVE');top3(s).forEach(function(t,i){L.push((i+1)+'. '+t);});
   L.push('');L.push('TRANSCRIPT');
-  S.answers.forEach(function(a,i){L.push('');L.push('Answer '+(i+1)+' ('+fmt(a.durMs)+(a.short?', short reply':'')+')');L.push(a.text||'(no text)');});
+  S.answers.forEach(function(a,i){L.push('');L.push('Answer '+(i+1)+' (starts '+(a.at==null?'-':fmt(a.at))+', '+fmt(a.durMs)+(a.short?', short reply':'')+')');L.push(a.text||'(no text)');});
   return L.join('\n');
 }
 function copyText(){
@@ -876,6 +928,7 @@ function bind(){
   $('lang').addEventListener('change',function(){cfg.lang=$('lang').value;saveCfg();if(S.running&&S.rec){try{S.rec.stop();}catch(e){}}});
   $('cCb').addEventListener('change',function(){cfg.cb=$('cCb').checked;saveCfg();applyView();});
   $('btnPause').addEventListener('click',function(){this.blur();togglePause();});
+  $('btnSip').addEventListener('click',function(){this.blur();toggleSip();});
   $('btnCheck').addEventListener('click',function(){this.blur();openCheck();});
   $('micAge').addEventListener('click',function(){this.blur();openCheck();});
   $('recBtn').addEventListener('click',function(){this.blur();$('recFile').value='';$('recFile').click();});
@@ -894,9 +947,15 @@ function bind(){
   $('btnNext').addEventListener('click',nextQ);$('btnShuffle').addEventListener('click',shuffleQ);
   $('btnBack').addEventListener('click',function(){$('summary').hidden=true;$('main').hidden=false;});
   $('btnDl').addEventListener('click',download);$('btnCopy').addEventListener('click',copyText);
+  var ctrlSolo=false;
   document.addEventListener('keydown',function(e){
+    /* Ctrl on its own = pause. Ctrl used with another key (Ctrl+C and so on) is ignored. */
+    if(e.key==='Control'){ctrlSolo=!e.repeat&&!e.shiftKey&&!e.altKey&&!e.metaKey;return;}
+    ctrlSolo=false;
     if(e.ctrlKey||e.metaKey||e.altKey)return;
     var tg=e.target&&e.target.tagName;
+    if(e.key==='ArrowRight'&&$('settings').hidden&&$('check').hidden&&!(tg==='INPUT'&&/text|number/.test(e.target.type))&&tg!=='TEXTAREA'){
+      e.preventDefault();if(document.activeElement)document.activeElement.blur();toggleSip();return;}
     if(tg==='INPUT'&&e.target.type!=='checkbox'||tg==='SELECT'||tg==='TEXTAREA')return;
     if(e.key==='Escape'){$('settings').hidden=true;if(!$('check').hidden)closeCheck();return;}
     if(!$('settings').hidden||!$('check').hidden)return;
@@ -909,7 +968,10 @@ function bind(){
     else if(k==='c'){cfg.compact=!cfg.compact;saveCfg();applyView();}
     else if(k==='t'){cfg.transcript=!cfg.transcript;saveCfg();applyView();}
   });
-  document.addEventListener('keyup',function(e){if(e.code==='Space'&&e.target&&e.target.tagName==='BUTTON')e.preventDefault();});
+  document.addEventListener('keyup',function(e){
+    if(e.key==='Control'){if(ctrlSolo&&$('settings').hidden&&$('check').hidden)togglePause();ctrlSolo=false;return;}
+    if(e.code==='Space'&&e.target&&e.target.tagName==='BUTTON')e.preventDefault();});
+  window.addEventListener('blur',function(){ctrlSolo=false;});
 }
 
 /* ---------- pause, wake lock, full screen, setup check ---------- */
@@ -917,17 +979,18 @@ function togglePause(){
   if(!S.running)return;
   var now=clock();
   if(!S.paused){
-    S.paused=true;S.pauseAt=now;
+    if(S.sip)endSip(now);
+    S.paused=true;S.pauseAt=now;S.pvb=[];S.pvHang=0;
     if(S.voiced){S.voiced=false;onVoiceEnd(now);}
     if(S.rec){S.rec.onend=null;try{S.rec.abort();}catch(e){}S.rec=null;}
     clearTalk();clearWords();$('speed').hidden=true;
-    $('statusTxt').textContent='Paused';$('btnPause').textContent='Resume (P)';
+    $('statusTxt').textContent='Paused';$('btnPause').textContent='Resume (Ctrl)';
   }else{
     var d=now-S.pauseAt;S.paused=false;
-    if(S.cur.start!==null)S.cur.start+=d;
+    if(S.cur.start!==null){S.cur.start+=d;S.cur.shift=(S.cur.shift||0)+d;}
     if(S.cur.lastVoiceEnd)S.cur.lastVoiceEnd+=d;
     S.lastVoiceEnd=now;S.hang=0;S.wordEvents=[];S.voicedLog=[];S.wpmEma=null;
-    $('statusTxt').textContent='Listening';$('btnPause').textContent='Pause (P)';
+    $('statusTxt').textContent='Listening';$('btnPause').textContent='Pause (Ctrl)';
     startRec();
   }
 }
@@ -955,7 +1018,7 @@ function testMic(){
   stopCheck();
   var AC=window.AudioContext||window.webkitAudioContext;CK.ctx=new AC();try{CK.ctx.resume();}catch(e){}
   navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:false}}).then(function(st){
-    CK.stream=st;var src=CK.ctx.createMediaStreamSource(st);CK.an=CK.ctx.createAnalyser();CK.an.fftSize=2048;src.connect(CK.an);
+    CK.stream=st;var src=CK.ctx.createMediaStreamSource(st);CK.an=CK.ctx.createAnalyser();CK.an.fftSize=2048;voiceBand(CK.ctx,src).connect(CK.an);
     CK.buf=new Float32Array(2048);CK.lv=0;
     var t0=clock(),quiet=[],speak=[],done=false;
     $('chkSaved').textContent='';$('chkLvl').textContent='';$('chkThr').style.display='none';
@@ -969,7 +1032,7 @@ function testMic(){
       else{
         done=true;var m=micFromTest(quiet,speak),e=$('chkLvl');
         if(!m){$('chkStep').textContent='I could not hear your voice.';e.textContent='Nothing was saved. Check that the right microphone is selected in Chrome, then try again.';e.className='ms r';return;}
-        m.t=Date.now();saveMic(m);showMicAge();
+        m.t=Date.now();m.f=1;saveMic(m);showMicAge();
         $('chkStep').textContent='✓ Saved. Start will use this level.';
         $('chkThr').style.left=(lvW(m.thr)*100)+'%';$('chkThr').style.display='block';
         if(m.ratio<4){e.textContent='Your voice is close to the room noise. Move the laptop a little closer or reduce noise, then test again.';e.className='ms a';}
