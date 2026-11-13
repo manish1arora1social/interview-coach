@@ -342,7 +342,7 @@ function micFromTest(quiet,speak){
   if(vf.length<15)return null;
   var voice=pct(vf,0.6);
   var thr=Math.max(MIN_THR,noise*2.5,voice*0.3);
-  thr=Math.min(thr,0.02);
+  thr=Math.min(thr,voice*0.5);
   return {thr:thr,noise:noise,voice:voice,ratio:voice/noise};
 }
 function fmt(ms){var s=Math.max(0,Math.floor(ms/1000));return Math.floor(s/60)+':'+('0'+(s%60)).slice(-2);}
@@ -521,15 +521,17 @@ function endSip(t){
   $('statusTxt').textContent=S.recName?'Recording test':'Listening';
 }
 /* The threshold comes from the saved mic test (or a safe default).
+   If the steady background (fan, air conditioning) gets louder than it was in the test, the bar rises with it.
    It is NEVER raised while running. It can only be lowered:
    (a) after 20 s with nothing loud, if the room is much quieter than the threshold, or
    (b) when Chrome hears words but the level stayed under the threshold (a quiet voice). */
 function vadStep(rms,now){
   S.level=S.level*0.7+rms*0.3;
   if(S.ctx&&S.ctx.state==='suspended'){try{S.ctx.resume();}catch(e){}}
-  var loud=rms>S.thr;
-  if(loud){S.hang=Math.max(S.hang,now+HANG);S.lastLoud=now;}
   S.rq.push(rms);if(S.rq.length>300)S.rq.shift();
+  if(!S.fgN||++S.fgN>=20){S.fgN=1;S.floorThr=S.rq.length>=100?S.thr0*Math.max(1,pct(S.rq,0.05)/S.noiseRef):0;}
+  var loud=rms>Math.max(S.thr,S.floorThr||0);
+  if(loud){S.hang=Math.max(S.hang,now+HANG);S.lastLoud=now;}
   if(!loud&&now-S.lastLoud>20000&&now-S.lastLower>5000&&S.rq.length>=300){
     var target=Math.max(MIN_THR,pct(S.rq,0.9)*2);
     if(target<S.thr){S.thr=Math.max(target,S.thr*0.85);S.lastLower=now;}
@@ -593,15 +595,17 @@ function snapshot(a){
   return {id:a.id,at:a.start===null?null:a.start-(a.shift||0)-S.t0,durMs:dur,short:dur<cfg.shortSec*1000,voicedMs:a.voicedMs,words:g.words,wpm:a.voicedMs>=3000&&!S.recName?g.words/(a.voicedMs/60000):null,
     A:g.A,B:g.B,C:g.C,I:g.I,W:g.W,N:g.N,longPauses:a.longPauses,hes:a.hes,ends:a.ends,fades:a.fades,reps:g.reps,text:g.text.join(' ')};
 }
+function isBlip(a){return a.start!==null&&agg(a.id).words===0&&((a.lastVoiceEnd||clock())-a.start)<SHORT_MS;}
 function finalizeCur(){
   var a=S.cur;if(!a)return;
+  if(isBlip(a))return;
   if(a.start!==null&&S.lastBurst)finalizeBurst(400);
   if(a.start!==null||agg(a.id).words>0){S.answers.push(snapshot(a));}
 }
 function newAnswer(manual){
   var a=S.cur;
   if(manual&&a&&a.start===null&&agg(a.id).words===0){return;}
-  finalizeCur();
+  var blip=isBlip(a);finalizeCur();if(blip)S.nextId=a.id;
   S.cur=newAns();S.wordEvents=[];S.voicedLog=[];S.hits=[];S.fadeLog=[];S.wpmEma=null;
   if(S.voiced){S.cur.start=clock();if(S.burst)S.burst.ans=S.cur;}
   clearTalk();clearWords();showLand(false);
@@ -759,7 +763,7 @@ function startSession(){
     var src=S.ctx.createMediaStreamSource(stream);S.an=S.ctx.createAnalyser();S.an.fftSize=2048;S.an.smoothingTimeConstant=0;
     voiceBand(S.ctx,src).connect(S.an);S.buf=new Float32Array(S.an.fftSize);
     var mic=loadMic();S.recName=null;
-    initRun(mic?mic.thr:DEF_THR,mic?mic.voice:0);
+    initRun(mic?mic.thr:DEF_THR,mic?mic.voice:0,mic?mic.noise:0);
     if(!mic)showMsg('Mic not checked. Using a safe default level. Run Check setup before your next session for the best results.');
     else showMsg('');
     S.vadT=setInterval(vad,50);S.tickT=setInterval(tick,200);
@@ -769,10 +773,10 @@ function startSession(){
     showMsg('The microphone is blocked or missing. Click the lock icon next to the address bar, allow the microphone, then press Start again.',true);
   });
 }
-function initRun(thr,voice){
+function initRun(thr,voice,noise){
   S.segs={};S.answers=[];S.nextId=1;S.cur=newAns();S.wordEvents=[];S.voicedLog=[];S.hits=[];
   S.totalWords=0;S.totalVoiced=0;S.lastVoiceEnd=0;S.voiced=false;S.burst=null;S.lastBurst=null;S.lvl=[];S.rq=[];S.lastLoud=0;S.lastLower=0;S.hang=0;
-  S.thr=thr;S.micVoice=voice;S.t0=clock();S.sip=null;S.pv=0;S.sips=0;
+  S.thr=thr;S.thr0=thr;S.noiseRef=noise||thr/2.5;S.micVoice=voice;S.floorThr=0;S.fgN=0;S.t0=clock();S.sip=null;S.pv=0;S.sips=0;
   S.running=true;S.paused=false;lockScreen();S.sessionStart=Date.now();
   $('btnStart').textContent='Stop';$('status').className='status on';$('statusTxt').textContent='Listening';
   $('summary').hidden=true;$('main').hidden=false;renderTrans();
@@ -781,7 +785,7 @@ function initRun(thr,voice){
 function runRecording(file){
   if(S.running){showMsg('Stop the session first, then test a recording.',true);return;}
   $('check').hidden=true;showMsg('Reading the recording… this can take a few seconds for a long file.');
-  var AC=window.AudioContext||window.webkitAudioContext,dc=new AC();
+  var AC=window.AudioContext||window.webkitAudioContext,dc;try{dc=new AC({sampleRate:16000});}catch(e){dc=new AC();}
   file.arrayBuffer().then(function(b){return dc.decodeAudioData(b);}).then(function(raw){
     try{dc.close();}catch(e){}
     var OC=window.OfflineAudioContext||window.webkitOfflineAudioContext,oc=new OC(1,raw.length,raw.sampleRate);
@@ -795,7 +799,7 @@ function runRecording(file){
     var all=Array.prototype.slice.call(rms),srt=all.slice().sort(function(a,b){return a-b;});
     var m=micFromTest(srt.slice(0,Math.max(5,Math.floor(n*0.2))),all);
     S.sim=0;S.recName=file.name;
-    initRun(m?m.thr:DEF_THR,m?m.voice:0);
+    initRun(m?m.thr:DEF_THR,m?m.voice:0,m?m.noise:0);
     showMsg('Testing "'+file.name+'" silently. Words, pace and fillers stay empty, because Chrome only turns a live microphone into words. Press S to stop early.');
     var speed=+$('recSpeed').value,pos=0,last=performance.now(),total=fmt(n*50);
     (function step(){
