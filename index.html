@@ -14,7 +14,7 @@
 body.cb{--green:#0059B3;--amber:#F0B400;--red:#A81C1C;--redhot:#B71C1C;--gT:#0059B3;--aT:#8A6A00;--rT:#A81C1C;--zbad:#A81C1C;--zmid:#F0B400;--zgood:#0059B3}
 @media (prefers-color-scheme:dark){body.cb{--gT:#6EA8FF;--aT:#F0B400;--rT:#FF8A80}}
 body.cb #circle.st-green{background:#0B3D91;color:#fff}
-body.cb #circle.st-blue{background:#9CC9F0;color:#0B1A26}
+body.cb #circle.st-blue{background:#ECEBE6;color:#141413}
 body.cb #circle.st-amber{background:#F0B400;color:#161513;outline:6px dashed var(--ink);outline-offset:6px}
 body.cb #circle.st-red{background:#A81C1C;outline:6px solid var(--ink);outline-offset:6px}
 body.cb .band.cA{background:#555;color:#fff}
@@ -71,15 +71,39 @@ header{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-cont
 #centre{text-align:center}
 #circle{margin:6px auto 12px;width:clamp(150px,30vmin,300px);height:clamp(150px,30vmin,300px);border-radius:50%;background:var(--muted);color:#fff;display:flex;align-items:center;justify-content:center;font-size:clamp(30px,7.6vmin,76px);font-weight:500;transition:background .6s}
 #circle.st-green{background:#1E5E3A;color:#fff}
-#circle.st-blue{background:#4FB3E8;color:#0B1A26}
-#circle.st-amber{background:#E58A00;color:#161513}
-#circle.st-red{background:#D32F2F;color:#fff}
+#circle.st-blue{background:#ECEBE6;color:#141413}
+#circle.st-amber{background:#F29A0C;color:#141413}
+#circle.st-red{background:#B3261E;color:#fff}
 #circle.st-sip{background:#8C8780;color:#fff;box-shadow:0 0 0 6px #8C8780,0 0 0 9px var(--bg),0 0 0 12px #8C8780}
 #circle.st-black{background:#000;color:#fff;box-shadow:0 0 0 8px #fff,0 0 0 12px #000}
 #circle.pulse{animation:cpulse 1.2s ease-in-out 1}
 #circle.spulse{animation:spulse 2.2s ease-in-out 1}
 @keyframes cpulse{0%{transform:scale(1)}50%{transform:scale(1.09)}100%{transform:scale(1)}}
 @keyframes spulse{0%{transform:scale(1);filter:brightness(1)}45%{transform:scale(1.12);filter:brightness(1.35)}100%{transform:scale(1);filter:brightness(1)}}
+/* full-screen interview view */
+#iv{position:fixed;inset:0;z-index:70;background:#141413;color:#F2F0EA;overflow:hidden;font-family:inherit}
+#iv[hidden]{display:none}
+#ivBg{position:absolute;inset:0;background:#141413}
+#iv.fade #ivBg{transition:background-color 1.5s ease,box-shadow 1.5s ease}
+#iv.frame #ivBg{background:#141413 !important}
+#ivDim{position:absolute;inset:0;background:#000;opacity:.25;pointer-events:none}
+#iv.flashing #ivDim{opacity:0;transition:none}
+#iv.flashback #ivDim{transition:opacity 1.2s ease}
+#ivMid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3vmin}
+#ivT{font-size:34vmin;font-weight:300;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums}
+#ivBar{width:46vw;height:2.6vmin;border-radius:2vmin;background:currentColor;opacity:0;box-shadow:0 0 3vmin currentColor}
+#ivBar.on{opacity:1}
+#ivBar.blink{animation:ivblink .5s steps(1) 3}
+#iv.fade #ivBar{transition:opacity .6s ease}
+@keyframes ivblink{0%{opacity:1}50%{opacity:0}}
+#ivPace{position:absolute;top:4vmin;right:4vmin;width:8vmin;height:8vmin;opacity:.9}
+#iv.big #ivPace{width:16vmin;height:16vmin}
+#iv.frame #ivPace{top:12vmin;right:12vmin}
+#iv.frame #ivNum{bottom:12vmin;left:12vmin}
+#ivNum{position:absolute;bottom:4vmin;left:4vmin;width:11vmin;height:11vmin}
+#ivPace svg,#ivNum svg{width:100%;height:100%;display:block}
+#iv.light{color:#141413}
+@media (prefers-reduced-motion:reduce){#ivBar.blink{animation:none}#iv.fade #ivBg{transition:none}}
 /* wrap-up screen (150% and over) */
 #land{position:fixed;inset:0;z-index:95;background:#000;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0;transition:opacity .5s;pointer-events:none}
 #land.on{opacity:1;pointer-events:auto}
@@ -149,6 +173,7 @@ body.talkFlash .bar{width:12vw}body.talkHold .bar{width:6vw}
 </style>
 </head>
 <body>
+<div id="iv" hidden aria-live="off"><div id="ivBg"></div><div id="ivDim"></div><div id="ivMid" style="color:inherit"><div id="ivT">0:00</div><div id="ivBar"></div></div><div id="ivPace"></div><div id="ivNum"></div></div>
 <div id="land" aria-live="assertive"><div id="landT">0:00</div><div id="landH">Wrap up · Space starts a new answer</div></div>
 <div id="wash"></div>
 <div class="bar" id="barL"></div><div class="bar" id="barR"></div>
@@ -166,7 +191,7 @@ body.talkFlash .bar{width:12vw}body.talkHold .bar{width:6vw}
 </div>
 <div class="hr">
 <label class="tg"><input type="checkbox" id="tgPractice"> Practice</label>
-<label class="tg"><input type="checkbox" id="tgQuiet"> Quiet mode</label>
+<label class="tg"><input type="checkbox" id="tgQuiet"> Interview view</label>
 <label class="tg"><input type="checkbox" id="tgCompact"> Compact</label>
 <label class="tg"><input type="checkbox" id="tgTrans"> Transcript</label>
 <button id="btnCheck" class="quiet">Check setup</button><button id="btnFull" class="quiet">Full screen (F)</button><button id="btnSettings" class="quiet">Settings</button>
@@ -233,13 +258,19 @@ body.talkFlash .bar{width:12vw}body.talkHold .bar{width:6vw}
 <div class="sr"><span>Green pace to (wpm)</span><input type="number" id="sHi" min="80" max="230" style="width:80px"></div>
 <div class="sr"><span>New answer after silence</span><span><input type="range" id="sSil" min="3" max="12" step="1"> <b id="sSilV"></b></span></div>
 <div class="sr"><span>Count as a short reply if under</span><span><input type="range" id="sShort" min="5" max="30" step="5"> <b id="sShortV"></b></span></div>
-<div class="sr"><span>Multicolour circle steps (off = simple green, amber, red)</span><input type="checkbox" id="cSteps"></div>
+<div class="sr"><span>Multicolour steps (off = simple green, amber, red)</span><input type="checkbox" id="cSteps"></div>
+<div class="sr"><span>Interview view colour</span><select id="sIvStyle"><option value="full">Full screen</option><option value="frame">Thick colour frame</option></select></div>
+<div class="sr"><span>Colour changes and filler signal</span><select id="sIvFx"><option value="flash">Flash once, then dim</option><option value="fade">Slow fade</option><option value="none">No flash</option></select></div>
+<div class="sr"><span>Pace symbols size</span><select id="sPaceBig"><option value="0">Normal</option><option value="1">Double</option></select></div>
+<div class="sr"><span>“Take a pause” symbol after talking without a pause for</span><select id="sPauseSec"><option value="30">30 seconds</option><option value="45">45 seconds</option><option value="60">60 seconds</option></select></div>
+<div class="sr"><span>“Take a pause” symbol</span><input type="checkbox" id="cPause"></div>
+<div class="sr"><span>Number reminder (#) after 60 seconds with no number</span><input type="checkbox" id="cNum"></div>
 <div class="sr"><span>Black wrap-up screen at 150% of the limit</span><input type="checkbox" id="cLand"></div>
 <div class="sr"><span>Flash length (seconds)</span><span><input type="range" id="sFl" min="1" max="4" step="0.5"> <b id="sFlV"></b></span></div>
 <div class="sr"><span>Word band hold (seconds)</span><span><input type="range" id="sHo" min="2" max="10" step="1"> <b id="sHoV"></b></span></div>
 <div class="sr"><span>Talking-too-long alert (sides and circle)</span><input type="checkbox" id="cTalk"></div>
-<div class="sr"><span>Filler and hedge alert (top and bottom)</span><input type="checkbox" id="cWords"></div>
-<div class="sr"><span>Speed line (bottom)</span><input type="checkbox" id="cSpeed"></div>
+<div class="sr"><span>Filler and hedge signal (underline in interview view)</span><input type="checkbox" id="cWords"></div>
+<div class="sr"><span>Pace symbols (speed up, slow down)</span><input type="checkbox" id="cSpeed"></div>
 <div class="sr"><span>Short text cue</span><input type="checkbox" id="cText"></div>
 <div class="sr"><span>Colour-blind safe colours and shapes</span><input type="checkbox" id="cCb"></div>
 <div class="sr"><span>Measure my pace</span><button id="btnMeasure2" class="quiet">Start 30 seconds</button></div>
@@ -366,10 +397,10 @@ function top3(s){
 //#PURE-END
 
 var QUESTIONS=["Tell me about yourself.","Tell me about a time you turned around a failing program.","How do you run a business review?","Walk me through how you would build a plan for a new region.","Tell me about a time you disagreed with your leader and how you handled it.","How do you prioritise when everything is urgent?","Describe a decision you made with incomplete data.","Tell me about a time you influenced a senior stakeholder without authority.","How do you set targets and quotas for a team?","Tell me about your biggest failure and what you changed afterwards.","How would you diagnose a drop in pipeline coverage?","Tell me about a process you simplified and the result.","How do you build a forecast you can defend?","Describe a time you had to deliver bad news to leadership.","How do you decide where to invest limited resources?","Tell me about a cross-functional project that was stuck and how you unblocked it.","How do you measure the success of an operating cadence?","Tell me about a time you led through ambiguity.","How would you structure a revenue operations team?","Describe how you have used data to change a strategy.","Tell me about a time you had to say no to a senior colleague.","How do you manage a team that is under pressure and behind plan?","Tell me about a time you built something from scratch.","How do you align sales, marketing and product on one plan?","Describe a time you coached someone who was struggling.","What is your approach to a first 90 days in a new role?","Tell me about a time you challenged the status quo.","How do you handle a stakeholder who keeps changing priorities?","Tell me about a time you delivered a result ahead of a tight deadline.","Why this role and why now?"];
-var DEF={v:2,tlMin:2,paceLo:120,paceHi:150,silenceSec:8,shortSec:15,steps:true,landIt:true,lang:'en-GB',cueTalk:true,cueWords:true,cueSpeed:true,cueText:true,flashSec:2,holdSec:5,cb:false,quiet:false,compact:false,transcript:true,practice:false};
+var DEF={v:3,ivStyle:'full',ivFx:'flash',paceBig:false,pauseSec:45,cuePause:true,cueNum:true,tlMin:2,paceLo:120,paceHi:150,silenceSec:8,shortSec:15,steps:true,landIt:true,lang:'en-GB',cueTalk:true,cueWords:true,cueSpeed:true,cueText:true,flashSec:2,holdSec:5,cb:false,quiet:true,compact:false,transcript:true,practice:false};
 var cfg=loadCfg();
 function loadCfg(){var c=Object.assign({},DEF);try{var r=localStorage.getItem('ic_cfg');if(r){var o=JSON.parse(r);
-  if(o.v!==DEF.v){['silenceSec','tlMin','paceLo','paceHi'].forEach(function(k){delete o[k];});o.v=DEF.v;}
+  if(o.v!==DEF.v){if(!o.v||o.v<2)['silenceSec','tlMin','paceLo','paceHi'].forEach(function(k){delete o[k];});delete o.quiet;o.v=DEF.v;}
   Object.keys(DEF).forEach(function(k){if(o[k]!==undefined&&typeof o[k]===typeof DEF[k])c[k]=o[k];});}}catch(e){}return c;}
 function saveCfg(){try{localStorage.setItem('ic_cfg',JSON.stringify(cfg));}catch(e){}}
 /* saved mic level: numbers only, never audio */
@@ -456,6 +487,7 @@ function fireWords(cat){
   if(!cfg.cueWords)return;
   if(now-S.lastWordFire<900)return;
   S.lastWordFire=now;
+  if(ivOn()){ivFiller();return;}
   ['bandTop','bandBot'].forEach(function(id){
     var el=$(id);el.className='band '+(id==='bandTop'?'top':'bot')+' c'+cat+' show on';
     el.firstChild.textContent=CATN[cat];reflow(el);el.classList.add('flash');
@@ -468,6 +500,7 @@ function fireWords(cat){
 }
 function clearWords(){clearTimeout(S.wT1);clearTimeout(S.wT2);clearTimeout(S.wT3);['bandTop','bandBot'].forEach(function(id){$(id).className='band '+(id==='bandTop'?'top':'bot');});}
 function talkFlash(){
+  if(ivOn())return;
   var b=document.body;document.documentElement.style.setProperty('--flash',cfg.flashSec+'s');
   b.classList.remove('talkHold','talkPulse');b.classList.remove('talkFlash');reflow(b);b.classList.add('talkFlash');
   var w=$('wash');w.classList.remove('go');reflow(w);w.classList.add('go');
@@ -479,8 +512,45 @@ function talkPulse(){
   c.classList.remove('pulse');reflow(c);c.classList.add('pulse');
   setTimeout(function(){b.classList.remove('talkPulse');c.classList.remove('pulse');},1300);
 }
+/* ---------- full-screen interview view ---------- */
+var IVC={green:['#1E5E3A','d'],blue:['#ECEBE6','l'],amber:['#F29A0C','l'],red:['#B3261E','d'],black:['#000000','d'],idle:['#141413','d'],sip:['#6E6A64','d'],paused:['#3A3936','d']};
+var IVCB={green:['#0B3D91','d'],blue:['#ECEBE6','l'],amber:['#F0B400','l'],red:['#7A1010','d']};
+var IVSVG={up:'<path d="M8 30 L24 14 L40 30 M8 42 L24 26 L40 42"/>',down:'<path d="M8 6 L24 22 L40 6 M8 18 L24 34 L40 18"/>',pause:'<path d="M17 8 V40 M31 8 V40"/>',hash:'<path d="M18 6 L14 42 M34 6 L30 42 M8 17 H42 M6 31 H40"/>'};
+function ivSvg(k){return '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+IVSVG[k]+'</svg>';}
+function ivOn(){return S.running&&cfg.quiet;}
+function ivRender(step,el,sig){
+  var iv=$('iv');
+  if(!ivOn()){if(!iv.hidden)iv.hidden=true;return;}
+  if(iv.hidden)iv.hidden=false;
+  sig=sig||{};
+  var col=(cfg.cb&&IVCB[step])||IVC[step]||IVC.idle,black=step==='black',frame=cfg.ivStyle==='frame'&&!black&&step!=='idle';
+  var cls=['fx-'+cfg.ivFx];if(cfg.ivFx==='fade')cls.push('fade');if(frame)cls.push('frame');if(cfg.paceBig)cls.push('big');
+  if(!frame&&col[1]==='l')cls.push('light');
+  ['flashing','flashback'].forEach(function(k){if(iv.classList.contains(k))cls.push(k);});
+  iv.className=cls.join(' ');
+  var bg=$('ivBg');
+  bg.style.backgroundColor=col[0];
+  bg.style.boxShadow=frame?'inset 0 0 0 9vmin '+col[0]:(black?'inset 0 0 0 1.2vmin #FFFFFF':'none');
+  $('ivDim').style.display=(black||step==='idle'||step==='sip'||step==='paused')?'none':'';
+  $('ivT').textContent=fmt(el);
+  $('ivT').style.opacity=(step==='paused')?0.45:1;
+  var pk=sig.pace||'';if($('ivPace').dataset.k!==pk){$('ivPace').dataset.k=pk;$('ivPace').innerHTML=pk?ivSvg(pk):'';}
+  var nk=sig.num?'1':'';if($('ivNum').dataset.k!==nk){$('ivNum').dataset.k=nk;$('ivNum').innerHTML=nk?ivSvg('hash'):'';}
+  if(S.ivStep!==step){
+    var main=['green','blue','amber','red','black'];
+    if(S.ivStep&&main.indexOf(step)>main.indexOf(S.ivStep)&&main.indexOf(S.ivStep)>=0&&cfg.ivFx==='flash')ivFlash();
+    S.ivStep=step;
+  }
+}
+function ivFlash(){var iv=$('iv');iv.classList.remove('flashback');iv.classList.add('flashing');clearTimeout(S.ivFT);
+  S.ivFT=setTimeout(function(){iv.classList.add('flashback');iv.classList.remove('flashing');},1200);}
+function ivFiller(){
+  var b=$('ivBar');clearTimeout(S.ivBT);b.className='';reflow(b);
+  if(cfg.ivFx==='flash'){b.className='on blink';S.ivBT=setTimeout(function(){b.className='on';S.ivBT=setTimeout(function(){b.className='';},2000);},1500);}
+  else{b.className='on';S.ivBT=setTimeout(function(){b.className='';},3000);}
+}
 function stepPulse(){var c=$('circle');c.classList.remove('spulse');reflow(c);c.classList.add('spulse');setTimeout(function(){c.classList.remove('spulse');},2300);}
-function showLand(on){var l=$('land');if(l.classList.contains('on')!==!!on)l.classList.toggle('on',!!on);}
+function showLand(on){if(ivOn())on=false;var l=$('land');if(l.classList.contains('on')!==!!on)l.classList.toggle('on',!!on);}
 function lvW(x){return Math.max(0,Math.min(1,(Math.log10(Math.max(x,1e-5))+3.5)/2.5));}
 function clearTalk(){clearTimeout(S.tT);var b=document.body;b.classList.remove('talkFlash','talkHold','talkPulse');}
 
@@ -573,6 +643,7 @@ function onVoiceStart(t){
   if(a.start===null){a.start=t;}
   else if(gap>=cfg.silenceSec*1000){newAnswer(false);S.cur.start=t;a=S.cur;}
   else if(gap>=3000){a.longPauses++;}
+  if(a.start===t||!S.rawEnd||t-S.rawEnd>=1500)a.breath=t;
   S.burst={s:t,gapBefore:gap,ans:a,words:false};S.bSum=0;S.bN=0;S.tail=[];
 }
 function onVoiceEnd(endT){
@@ -580,6 +651,7 @@ function onVoiceEnd(endT){
   var dur=Math.max(0,endT-b.s);
   if(dur>=1500&&S.bN>=20&&S.tail.length>=4){var body=S.bSum/S.bN,tl=S.tail.reduce(function(x,y){return x+y;},0)/S.tail.length;b.ans.ends++;if(tl<0.55*body){b.ans.fades++;S.fadeLog.push(clock());}}
   /* only real speech moves the answer's end: a short "Mhmm" or a bird chirp does not */
+  S.rawEnd=endT;
   if(dur>=SHORT_MS||b.words||!b.ans.lastVoiceEnd){S.lastVoiceEnd=endT;b.ans.lastVoiceEnd=endT;}
   b.ans.voicedMs+=dur;S.totalVoiced+=dur;
   S.voicedLog.push([b.s,endT]);
@@ -637,8 +709,8 @@ function wpmNow(){
 /* ---------- main tick ---------- */
 function tick(){
   if(!S.running)return;
-  if(S.sip&&S.cur&&S.cur.start!==null){showLand(false);var se=Math.max(0,S.sip.at-S.cur.start);$('timer').textContent=fmt(se);$('circle').className='st-sip';$('state').textContent='Sip break · just start speaking to continue';$('state').className='';setCue('');return;}
-  if(S.paused){showLand(false);var pe=(S.cur&&S.cur.start!==null)?Math.max(0,(S.cur.lastVoiceEnd||S.pauseAt)-S.cur.start):0;$('timer').textContent=fmt(pe);$('state').textContent='Paused · press Ctrl to resume, or just speak';$('state').className='';setCue('');return;}
+  if(S.sip&&S.cur&&S.cur.start!==null){showLand(false);var se=Math.max(0,S.sip.at-S.cur.start);ivRender('sip',se);$('timer').textContent=fmt(se);$('circle').className='st-sip';$('state').textContent='Sip break · just start speaking to continue';$('state').className='';setCue('');return;}
+  if(S.paused){showLand(false);var pe=(S.cur&&S.cur.start!==null)?Math.max(0,(S.cur.lastVoiceEnd||S.pauseAt)-S.cur.start):0;ivRender('paused',pe);$('timer').textContent=fmt(pe);$('state').textContent='Paused · press Ctrl to resume, or just speak';$('state').className='';setCue('');return;}
   var now=clock(),a=S.cur;
   S.wordEvents=S.wordEvents.filter(function(e){return now-e.t<60000;});
   S.voicedLog=S.voicedLog.filter(function(p){return now-p[1]<60000;});
@@ -711,6 +783,18 @@ function tick(){
     else if(S.lvl.length>10&&lvAvg>0.15)cue='A little softer';
   }
   setCue(cue);
+  /* interview view signals */
+  var sig={pace:null,num:false};
+  if(a.start!==null&&!ended&&!S.recName){
+    if(cfg.cueSpeed&&w!==null){
+      var dir=w>cfg.paceHi?'down':(w<cfg.paceLo?'up':null);
+      if(!dir)S.paceOut=null;else if(!S.paceOut||S.paceOut.dir!==dir)S.paceOut={dir:dir,t:now};
+      if(S.paceOut&&now-S.paceOut.t>=20000)sig.pace=S.paceOut.dir;
+    }
+    if(cfg.cueNum&&el>=60000&&g.N===0)sig.num=true;
+  }
+  if(a.start!==null&&!ended&&cfg.cuePause&&(S.voiced||now-(S.rawEnd||0)<1500)&&a.breath&&now-a.breath>=cfg.pauseSec*1000)sig.pace='pause';
+  ivRender(step,el,sig);
   /* calibration */
   if(S.calib){
     var left=Math.max(0,30000-(now-S.calib.t0));
@@ -776,7 +860,7 @@ function startSession(){
 function initRun(thr,voice,noise){
   S.segs={};S.answers=[];S.nextId=1;S.cur=newAns();S.wordEvents=[];S.voicedLog=[];S.hits=[];
   S.totalWords=0;S.totalVoiced=0;S.lastVoiceEnd=0;S.voiced=false;S.burst=null;S.lastBurst=null;S.lvl=[];S.rq=[];S.lastLoud=0;S.lastLower=0;S.hang=0;
-  S.thr=thr;S.thr0=thr;S.noiseRef=noise||thr/2.5;S.micVoice=voice;S.floorThr=0;S.fgN=0;S.t0=clock();S.sip=null;S.pv=0;S.sips=0;
+  S.rawEnd=0;S.paceOut=null;S.ivStep=null;S.thr=thr;S.thr0=thr;S.noiseRef=noise||thr/2.5;S.micVoice=voice;S.floorThr=0;S.fgN=0;S.t0=clock();S.sip=null;S.pv=0;S.sips=0;
   S.running=true;S.paused=false;lockScreen();S.sessionStart=Date.now();
   $('btnStart').textContent='Stop';$('status').className='status on';$('statusTxt').textContent='Listening';
   $('summary').hidden=true;$('main').hidden=false;renderTrans();
@@ -820,7 +904,7 @@ function stopSession(silent){
   if(S.stream){S.stream.getTracks().forEach(function(t){t.stop();});S.stream=null;}
   if(S.ctx){try{S.ctx.close();}catch(e){}S.ctx=null;}
   S.an=null;S.calib=null;S.paused=false;unlockScreen();$('btnPause').textContent='Pause (Ctrl)';
-  clearTalk();clearWords();showLand(false);$('speed').hidden=true;
+  clearTalk();clearWords();showLand(false);$('speed').hidden=true;$('iv').hidden=true;S.ivStep=null;
   $('btnStart').textContent='Start';$('status').className='status';$('statusTxt').textContent='Not listening';
   setCue('');$('state').textContent='Press Start (S)';$('state').className='';
   if(was){finalizeCur();if(!silent&&S.answers.length)showSummary();}
@@ -909,6 +993,7 @@ function applyView(){
   document.body.classList.toggle('cb',cfg.cb);document.body.classList.toggle('quiet',cfg.quiet);document.body.classList.toggle('compact',cfg.compact);
   $('practiceBox').hidden=!cfg.practice;$('transBox').hidden=!cfg.transcript;
   $('transBox').style.gridColumn=cfg.practice?'2':'1 / -1';
+  if(!cfg.quiet||!S.running)$('iv').hidden=true;
   $('tgPractice').checked=cfg.practice;$('tgQuiet').checked=cfg.quiet;$('tgCompact').checked=cfg.compact;$('tgTrans').checked=cfg.transcript;
 }
 function syncSettings(){
@@ -917,6 +1002,8 @@ function syncSettings(){
   $('sSil').value=cfg.silenceSec;$('sSilV').textContent=cfg.silenceSec+' s';
   $('sShort').value=cfg.shortSec;$('sShortV').textContent=cfg.shortSec+' s';
   $('cSteps').checked=cfg.steps;$('cLand').checked=cfg.landIt;
+  $('sIvStyle').value=cfg.ivStyle;$('sIvFx').value=cfg.ivFx;$('sPaceBig').value=cfg.paceBig?'1':'0';$('sPauseSec').value=String(cfg.pauseSec);
+  $('cPause').checked=cfg.cuePause;$('cNum').checked=cfg.cueNum;
   $('sFl').value=cfg.flashSec;$('sFlV').textContent=cfg.flashSec+' s';
   $('sHo').value=cfg.holdSec;$('sHoV').textContent=cfg.holdSec+' s';
   $('cCb').checked=cfg.cb;$('cTalk').checked=cfg.cueTalk;$('cWords').checked=cfg.cueWords;$('cSpeed').checked=cfg.cueSpeed;$('cText').checked=cfg.cueText;
@@ -927,7 +1014,7 @@ function bind(){
   num('sTl','tlMin',' min','sTlV');num('sSil','silenceSec',' s','sSilV');num('sFl','flashSec',' s','sFlV');num('sHo','holdSec',' s','sHoV');num('sShort','shortSec',' s','sShortV');
   $('sLo').addEventListener('change',function(){var v=parseInt($('sLo').value,10);if(!isNaN(v)&&v<cfg.paceHi){cfg.paceLo=v;saveCfg();}syncSettings();});
   $('sHi').addEventListener('change',function(){var v=parseInt($('sHi').value,10);if(!isNaN(v)&&v>cfg.paceLo){cfg.paceHi=v;saveCfg();}syncSettings();});
-  [['cTalk','cueTalk'],['cWords','cueWords'],['cSpeed','cueSpeed'],['cText','cueText'],['cSteps','steps'],['cLand','landIt']].forEach(function(p){$(p[0]).addEventListener('change',function(){cfg[p[1]]=$(p[0]).checked;saveCfg();});});
+  [['cTalk','cueTalk'],['cWords','cueWords'],['cSpeed','cueSpeed'],['cText','cueText'],['cSteps','steps'],['cLand','landIt'],['cPause','cuePause'],['cNum','cueNum']].forEach(function(p){$(p[0]).addEventListener('change',function(){cfg[p[1]]=$(p[0]).checked;saveCfg();});});
   [['tgPractice','practice'],['tgQuiet','quiet'],['tgCompact','compact'],['tgTrans','transcript']].forEach(function(p){$(p[0]).addEventListener('change',function(){cfg[p[1]]=$(p[0]).checked;saveCfg();applyView();});});
   $('lang').addEventListener('change',function(){cfg.lang=$('lang').value;saveCfg();if(S.running&&S.rec){try{S.rec.stop();}catch(e){}}});
   $('cCb').addEventListener('change',function(){cfg.cb=$('cCb').checked;saveCfg();applyView();});
@@ -935,6 +1022,10 @@ function bind(){
   $('btnSip').addEventListener('click',function(){this.blur();toggleSip();});
   $('btnCheck').addEventListener('click',function(){this.blur();openCheck();});
   $('micAge').addEventListener('click',function(){this.blur();openCheck();});
+  $('sIvStyle').addEventListener('change',function(){cfg.ivStyle=this.value;saveCfg();});
+  $('sIvFx').addEventListener('change',function(){cfg.ivFx=this.value;saveCfg();});
+  $('sPaceBig').addEventListener('change',function(){cfg.paceBig=this.value==='1';saveCfg();});
+  $('sPauseSec').addEventListener('change',function(){cfg.pauseSec=+this.value;saveCfg();});
   $('recBtn').addEventListener('click',function(){this.blur();$('recFile').value='';$('recFile').click();});
   $('recFile').addEventListener('change',function(){var f=this.files&&this.files[0];if(f){closeCheck();runRecording(f);}});
   $('btnFull').addEventListener('click',function(){this.blur();toggleFull();});
